@@ -12,8 +12,6 @@ The web front end interacts with the redis master via javascript redis API calls
 
 This example requires a kubernetes cluster.  See the [Getting Started guides](../../docs/getting-started-guides) for how to get started.
 
-If you are running from source, replace commands such as `kubectl` below with calls to `cluster/kubectl.sh`.
-
 ### Step One: Fire up the redis master
 
 Note: This redis-master is *not* highly available.  Making it highly available would be a very interesting, but intricate exercise - redis doesn't actually support multi-master deployments at the time of this writing, so high availability would be a somewhat tricky thing to implement, and might involve periodic serialization to disk, and so on.
@@ -153,7 +151,7 @@ This will cause all pods to see the redis master apparently running on <ip>:6379
 Thus, once created, the service proxy on each minion is configured to set up a proxy on the specified port (in this case port 6379).
 
 ### Step Three: Fire up the replicated slave pods
-Although the redis master is a single pod, the redis read slaves are a 'replicated' pod. In Kubernetes, a replication controller is responsible for managing multiple instances of a replicated pod.  The replicationController will automatically launch new Pods if the number of replicas falls (this is quite easy - and fun - to test, just kill the docker processes for your pods at will and watch them come back online on a new node shortly thereafter).
+Although the redis master is a single pod, the redis read slaves are a 'replicated' pod. In Kubernetes, a replication controller is responsible for managing multiple instances of a replicated pod.  The replication controller will automatically launch new pods if the number of replicas falls (this is quite easy - and fun - to test, just kill the docker processes for your pods at will and watch them come back online on a new node shortly thereafter).
 
 Use the file `examples/guestbook/redis-slave-controller.json`, which looks like this:
 
@@ -252,7 +250,7 @@ The service specification for the slaves is in `examples/guestbook/redis-slave-s
 }
 ```
 
-This time the selector for the service is `name=redis-slave`, because that identifies the pods running redis slaves. It may also be helpful to set labels on your service itself as we've done here to make it easy to locate them with the `cluster/kubectl.sh get services -l "label=value"` command.
+This time the selector for the service is `name=redis-slave`, because that identifies the pods running redis slaves. It may also be helpful to set labels on your service itself as we've done here to make it easy to locate them with the `kubectl get services -l "label=value"` command.
 
 Now that you have created the service specification, create it in your cluster by running:
 
@@ -385,8 +383,6 @@ if (isset($_GET['cmd']) === true) {
 Just like the others, you want a service to group your frontend pods.
 The service is described in the file `examples/guestbook/frontend-service.json`:
 
-**NOTE** This json snippet has been modified, in that it adds the publicIPs field for illustration purposes only.
-
 ```js
 {
    "kind":"Service",
@@ -431,7 +427,7 @@ redis-slave             name=redis-slave                          name=redis-sla
 
 ### A few Google Container Engine specifics for playing around with the services.
 
-In GCE, `cluster/kubectl.sh` automatically creates forwarding rule for services with `createExternalLoadBalancer`.
+In GCE, `kubectl` automatically creates forwarding rule for services with `createExternalLoadBalancer`.
 
 ```shell
 $ gcloud compute forwarding-rules list
