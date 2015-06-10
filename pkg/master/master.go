@@ -33,6 +33,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/experimental"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
@@ -86,7 +87,6 @@ const (
 type Config struct {
 	EtcdHelper    tools.EtcdHelper
 	EventTTL      time.Duration
-	MinionRegexp  string
 	KubeletClient client.KubeletClient
 	// allow downstream consumers to disable the core controller loops
 	EnableCoreControllers bool
@@ -94,10 +94,10 @@ type Config struct {
 	EnableUISupport       bool
 	// allow downstream consumers to disable swagger
 	EnableSwaggerSupport bool
-	// allow v1beta3 to be conditionally disabled
-	DisableV1Beta3 bool
-	// allow v1 to be conditionally disabled
-	DisableV1 bool
+	// allow api versions to be conditionally disabled
+	DisableV1Beta3      bool
+	DisableV1           bool
+	EnableExperimental  bool
 	// allow downstream consumers to disable the index route
 	EnableIndex           bool
 	EnableProfiling       bool
@@ -181,6 +181,7 @@ type Master struct {
 	masterCount           int
 	v1beta3               bool
 	v1                    bool
+	experimental          bool
 	requestContextMapper  api.RequestContextMapper
 
 	// External host is the name that should be used in external (public internet) URLs for this master
@@ -331,6 +332,7 @@ func New(c *Config) *Master {
 		admissionControl:      c.AdmissionControl,
 		v1beta3:               !c.DisableV1Beta3,
 		v1:                    !c.DisableV1,
+		experimental:          c.EnableExperimental,
 		requestContextMapper:  c.RequestContextMapper,
 
 		cacheTimeout: c.CacheTimeout,
@@ -545,6 +547,17 @@ func (m *Master) init(c *Config) {
 	requestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(defaultVersion.Root, "/")), defaultVersion.Mapper}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer.Container, requestInfoResolver, apiVersions)
 
+	if m.experimental || true {
+		if err := m.experimental_v0().InstallREST(m.handlerContainer, proxyDialer); err != nil {
+			glog.Fatalf("Unable to setup experimental API: %v", err)
+		}
+		expVersions := []string{experimental.Version}
+		apiserver.AddApiWebService(m.handlerContainer.Container, "/experimental", expVersions)
+		expVersion := m.experimentalAPIGroupVersion()
+		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(expVersion.Root, "/")), expVersion.Mapper}
+		apiserver.InstallServiceErrorHandler(m.handlerContainer.Container, expRequestInfoResolver, expVersions)
+	}
+
 	// Register root handler.
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
 	// Allow master to be embedded in contexts which already have something registered at the root
@@ -581,7 +594,7 @@ func (m *Master) init(c *Config) {
 
 	m.InsecureHandler = handler
 
-	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, latest.RESTMapper, "api")
+	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, latest.RESTMapper, "api", "experimental")
 	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, m.authorizer)
 
 	// Install Authenticator
@@ -723,6 +736,21 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 	}
 }
 
+func (m *Master) experimentalAPIGroupVersion() *apiserver.APIGroupVersion {
+	return &apiserver.APIGroupVersion{
+		Root:   "/experimental",
+		Mapper: latest.RESTMapper, // TODO: FIXME
+
+		Creater:   experimental.Scheme,
+		Convertor: experimental.Scheme,
+		Typer:     experimental.Scheme,
+		Linker:    latest.SelfLinker, // TODO: FIXME
+
+		Admit:   m.admissionControl,
+		Context: m.requestContextMapper,
+	}
+}
+
 // api_v1beta3 returns the resources and codec for API version v1beta3.
 func (m *Master) api_v1beta3() *apiserver.APIGroupVersion {
 	storage := make(map[string]rest.Storage)
@@ -752,6 +780,22 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 	version.Storage = storage
 	version.Version = "v1"
 	version.Codec = v1.Codec
+	return version
+}
+
+// experimental_v0 returns the resources and codec for the experimental API.
+func (m *Master) experimental_v0() *apiserver.APIGroupVersion {
+	storage := make(map[string]rest.Storage)
+	for k, v := range m.storage {
+		if k == "minions" || k == "minions/status" {
+			continue
+		}
+		storage[strings.ToLower(k)] = v
+	}
+	version := m.experimentalAPIGroupVersion()
+	version.Storage = storage
+	version.Version = experimental.Version
+	version.Codec = experimental.Codec
 	return version
 }
 
