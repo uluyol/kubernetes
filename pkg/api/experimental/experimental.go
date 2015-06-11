@@ -7,15 +7,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-// Version is the string that represents the current external default version.
-var Version = "v0"
-
-// Codec is the default codec for serializing output that should use
-// the latest supported version.  Use this Codec when writing to
-// disk, a data store that is not dynamically versioned, or in tests.
-// This codec can decode any object that Kubernetes is aware of.
-var Codec runtime.Codec
-
 // accessor is the shared static metadata accessor for the API.
 var accessor = meta.NewAccessor()
 
@@ -30,7 +21,6 @@ var SelfLinker = runtime.SelfLinker(accessor)
 var RESTMapper meta.RESTMapper
 
 func init() {
-	Codec = runtime.CodecFor(Scheme, Version)
 	versions := []string{Version}
 
 	mapper := meta.NewDefaultRESTMapper(

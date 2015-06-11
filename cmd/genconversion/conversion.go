@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/experimental"
 	pkg_runtime "github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/golang/glog"

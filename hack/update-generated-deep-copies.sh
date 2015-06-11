@@ -50,7 +50,7 @@ EOF
 	mv $TMPFILE `result_file_name ${version}`
 }
 
-VERSIONS="api v1beta3 v1"
+VERSIONS="api v1beta3 v1 experimental"
 # To avoid compile errors, remove the currently existing files.
 for ver in $VERSIONS; do
 	rm -f `result_file_name ${ver}`

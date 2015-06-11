@@ -786,12 +786,6 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 // experimental_v0 returns the resources and codec for the experimental API.
 func (m *Master) experimental_v0() *apiserver.APIGroupVersion {
 	storage := make(map[string]rest.Storage)
-	for k, v := range m.storage {
-		if k == "minions" || k == "minions/status" {
-			continue
-		}
-		storage[strings.ToLower(k)] = v
-	}
 	version := m.experimentalAPIGroupVersion()
 	version.Storage = storage
 	version.Version = experimental.Version

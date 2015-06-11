@@ -48,7 +48,7 @@ EOF
 	mv $TMPFILE pkg/api/${version}/conversion_generated.go
 }
 
-VERSIONS="v1beta3 v1"
+VERSIONS="v1beta3 v1 experimental"
 for ver in $VERSIONS; do 
 	generate_version "${ver}"
 done
