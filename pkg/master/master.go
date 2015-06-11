@@ -52,6 +52,7 @@ import (
 	endpointsetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
+	helloetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/experimental/hello/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	nodeetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion/etcd"
@@ -95,9 +96,9 @@ type Config struct {
 	// allow downstream consumers to disable swagger
 	EnableSwaggerSupport bool
 	// allow api versions to be conditionally disabled
-	DisableV1Beta3      bool
-	DisableV1           bool
-	EnableExperimental  bool
+	DisableV1Beta3     bool
+	DisableV1          bool
+	EnableExperimental bool
 	// allow downstream consumers to disable the index route
 	EnableIndex           bool
 	EnableProfiling       bool
@@ -194,7 +195,8 @@ type Master struct {
 	masterServices       *util.Runner
 
 	// storage contains the RESTful endpoints exposed by this master
-	storage map[string]rest.Storage
+	storage             map[string]rest.Storage
+	experimentalStorage map[string]rest.Storage
 
 	// registries are internal client APIs for accessing the storage layer
 	// TODO: define the internal typed interface in a way that clients can
@@ -548,6 +550,9 @@ func (m *Master) init(c *Config) {
 	apiserver.InstallServiceErrorHandler(m.handlerContainer.Container, requestInfoResolver, apiVersions)
 
 	if m.experimental || true {
+		m.experimentalStorage = map[string]rest.Storage{
+			"hello": helloetcd.NewStorage(c.EtcdHelper),
+		}
 		if err := m.experimental_v0().InstallREST(m.handlerContainer, proxyDialer); err != nil {
 			glog.Fatalf("Unable to setup experimental API: %v", err)
 		}
@@ -785,9 +790,8 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 
 // experimental_v0 returns the resources and codec for the experimental API.
 func (m *Master) experimental_v0() *apiserver.APIGroupVersion {
-	storage := make(map[string]rest.Storage)
 	version := m.experimentalAPIGroupVersion()
-	version.Storage = storage
+	version.Storage = m.experimentalStorage
 	version.Version = experimental.Version
 	version.Codec = experimental.Codec
 	return version
