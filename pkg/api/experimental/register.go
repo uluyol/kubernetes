@@ -1,6 +1,7 @@
 package experimental
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -20,9 +21,14 @@ func init() {
 	Scheme.AddKnownTypes("v0",
 		&Hello{},
 		&HelloList{},
+
+		&api.ListOptions{},
+		&api.DeleteOptions{},
+		&api.Status{},
 	)
 
 	addDefaultingFuncs()
+	initExperimental()
 }
 
 func (*Hello) IsAnAPIObject()     {}

@@ -1,7 +1,6 @@
 package experimental
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -16,11 +15,11 @@ var accessor = meta.NewAccessor()
 // to go through the InterfacesFor method below.
 var SelfLinker = runtime.SelfLinker(accessor)
 
-// RESTMapper provides the default mapping between REST paths and the objects declared in api.Scheme and all known
+// RESTMapper provides the default mapping between REST paths and the objects declared in Scheme and all known
 // Kubernetes versions.
 var RESTMapper meta.RESTMapper
 
-func init() {
+func initExperimental() {
 	versions := []string{Version}
 
 	mapper := meta.NewDefaultRESTMapper(
@@ -46,7 +45,7 @@ func init() {
 	ignoredKinds := util.NewStringSet()
 
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources.
-	for kind := range api.Scheme.KnownTypes(Version) {
+	for kind := range Scheme.KnownTypes(Version) {
 		if ignoredKinds.Has(kind) {
 			continue
 		}
