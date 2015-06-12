@@ -744,12 +744,12 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 func (m *Master) experimentalAPIGroupVersion() *apiserver.APIGroupVersion {
 	return &apiserver.APIGroupVersion{
 		Root:   "/experimental",
-		Mapper: latest.RESTMapper, // TODO: FIXME
+		Mapper: experimental.RESTMapper, // TODO: FIXME
 
 		Creater:   experimental.Scheme,
 		Convertor: experimental.Scheme,
 		Typer:     experimental.Scheme,
-		Linker:    latest.SelfLinker, // TODO: FIXME
+		Linker:    experimental.SelfLinker, // TODO: FIXME
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,
