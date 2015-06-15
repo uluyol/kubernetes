@@ -39,10 +39,18 @@ func initExperimental() {
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
 	kindToRootScope := map[string]bool{
-		"Hello": true,
+		"Namespace": true,
 	}
 
-	ignoredKinds := util.NewStringSet()
+	// these kinds should be excluded from the list of resources
+	ignoredKinds := util.NewStringSet(
+		"ListOptions",
+		"DeleteOptions",
+		"Status",
+		"ContainerManifest",
+		"PodLogOptions",
+		"PodExecOptions",
+		"PodProxyOptions")
 
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources.
 	for kind := range Scheme.KnownTypes(Version) {

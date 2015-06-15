@@ -162,9 +162,11 @@ func (s *Scheme) NewObject(versionName, kind string) (interface{}, error) {
 		if t, ok := types[kind]; ok {
 			return reflect.New(t).Interface(), nil
 		}
-		return nil, &notRegisteredErr{kind: kind, version: versionName}
+		errStr := fmt.Sprintf("[version: %s, versionMap: %v, types: %v]", versionName, s.versionMap, types)
+		return nil, &notRegisteredErr{kind: kind, version: errStr}
 	}
-	return nil, &notRegisteredErr{kind: kind, version: versionName}
+	errStr := fmt.Sprintf("[version: %s, versionMap: %v]", versionName, s.versionMap)
+	return nil, &notRegisteredErr{kind: kind, version: errStr}
 }
 
 // AddConversionFuncs adds functions to the list of conversion functions. The given

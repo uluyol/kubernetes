@@ -25,7 +25,7 @@ import (
 )
 
 // AUTO-GENERATED FUNCTIONS START HERE
-func init() {
+func addConversionFuncs() {
 	err := Scheme.AddConversionFuncs(
 		func(in *util.Time, out *util.Time, s conversion.Scope) error {
 			// Cannot deep copy these, because time.Time has unexported fields.

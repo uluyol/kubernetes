@@ -18,16 +18,28 @@ var Codec = runtime.CodecFor(Scheme, Version)
 var Scheme = runtime.NewScheme()
 
 func init() {
-	Scheme.AddKnownTypes("v0",
+	Scheme.AddKnownTypes("",
 		&Hello{},
 		&HelloList{},
 
+		&api.Namespace{},
+		&api.ListOptions{},
+		&api.DeleteOptions{},
+		&api.Status{},
+	)
+
+	Scheme.AddKnownTypes(Version,
+		&Hello{},
+		&HelloList{},
+
+		&api.Namespace{},
 		&api.ListOptions{},
 		&api.DeleteOptions{},
 		&api.Status{},
 	)
 
 	addDefaultingFuncs()
+	addConversionFuncs()
 	initExperimental()
 }
 

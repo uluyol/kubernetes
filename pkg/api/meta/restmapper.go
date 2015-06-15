@@ -159,7 +159,7 @@ func kindToResource(kind string, mixedCase bool) (plural, singular string) {
 func (m *DefaultRESTMapper) VersionAndKindForResource(resource string) (defaultVersion, kind string, err error) {
 	meta, ok := m.mapping[strings.ToLower(resource)]
 	if !ok {
-		return "", "", fmt.Errorf("no resource %q has been defined", resource)
+		return "", "", fmt.Errorf("no resource %q has been defined [%v]", resource, m.mapping)
 	}
 	return meta.APIVersion, meta.Kind, nil
 }
