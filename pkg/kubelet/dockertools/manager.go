@@ -48,9 +48,11 @@ import (
 )
 
 const (
-	// The oom_score_adj of the POD infrastructure container. The default is 0, so
-	// any value below that makes it *less* likely to get OOM killed.
-	podOomScoreAdj = -100
+	// The oom_score_adj of the POD infrastructure container. The default is 0 for
+	// any other docker containers, so any value below that makes it *less* likely
+	// to get OOM killed.
+	podOomScoreAdj           = -100
+	userContainerOomScoreAdj = 0
 
 	maxReasonCacheEntries = 200
 
@@ -910,8 +912,10 @@ func (dm *DockerManager) RunInContainer(containerID string, cmd []string) ([]byt
 		return nil, err
 	}
 	if !useNativeExec {
+		glog.V(2).Infof("Using nsinit to run the command %+v inside container %s", cmd, containerID)
 		return dm.runInContainerUsingNsinit(containerID, cmd)
 	}
+	glog.V(2).Infof("Using docker native exec to run cmd %+v inside container %s", cmd, containerID)
 	createOpts := docker.CreateExecOptions{
 		Container:    containerID,
 		Cmd:          cmd,
@@ -934,16 +938,19 @@ func (dm *DockerManager) RunInContainer(containerID string, cmd []string) ([]byt
 	}
 	err = dm.client.StartExec(execObj.ID, startOpts)
 	if err != nil {
+		glog.V(2).Infof("StartExec With error: %v", err)
 		return nil, err
 	}
 	tick := time.Tick(2 * time.Second)
 	for {
 		inspect, err2 := dm.client.InspectExec(execObj.ID)
 		if err2 != nil {
+			glog.V(2).Infof("InspectExec %s failed with error: %+v", execObj.ID, err2)
 			return buf.Bytes(), err2
 		}
 		if !inspect.Running {
 			if inspect.ExitCode != 0 {
+				glog.V(2).Infof("InspectExec %s exit with result %+v", execObj.ID, inspect)
 				err = &dockerExitError{inspect}
 			}
 			break
@@ -1036,29 +1043,38 @@ func (dm *DockerManager) KillPod(pod kubecontainer.Pod) error {
 	// can be Len errors + the networkPlugin teardown error.
 	errs := make(chan error, len(pod.Containers)+1)
 	wg := sync.WaitGroup{}
+	var networkID types.UID
 	for _, container := range pod.Containers {
 		wg.Add(1)
 		go func(container *kubecontainer.Container) {
 			defer util.HandleCrash()
+			defer wg.Done()
 
 			// TODO: Handle this without signaling the pod infra container to
 			// adapt to the generic container runtime.
 			if container.Name == PodInfraContainerName {
-				err := dm.networkPlugin.TearDownPod(pod.Namespace, pod.Name, kubeletTypes.DockerID(container.ID))
-				if err != nil {
-					glog.Errorf("Failed tearing down the infra container: %v", err)
-					errs <- err
-				}
+				// Store the container runtime for later deletion.
+				// We do this so that PreStop handlers can run in the network namespace.
+				networkID = container.ID
+				return
 			}
-			err := dm.killContainer(container.ID)
-			if err != nil {
+			if err := dm.killContainer(container.ID); err != nil {
 				glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, pod.ID)
 				errs <- err
 			}
-			wg.Done()
 		}(container)
 	}
 	wg.Wait()
+	if len(networkID) > 0 {
+		if err := dm.networkPlugin.TearDownPod(pod.Namespace, pod.Name, kubeletTypes.DockerID(networkID)); err != nil {
+			glog.Errorf("Failed tearing down the infra container: %v", err)
+			errs <- err
+		}
+		if err := dm.killContainer(networkID); err != nil {
+			glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, pod.ID)
+			errs <- err
+		}
+	}
 	close(errs)
 	if len(errs) > 0 {
 		errList := []error{}
@@ -1181,6 +1197,28 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 	if err = dm.os.Symlink(containerLogFile, symlinkFile); err != nil {
 		glog.Errorf("Failed to create symbolic link to the log file of pod %q container %q: %v", podFullName, container.Name, err)
 	}
+
+	// Set OOM score of POD container to lower than those of the other containers
+	// which have OOM score 0 by default in the pod. This ensures that it is
+	// killed only as a last resort.
+	containerInfo, err := dm.client.InspectContainer(string(id))
+	if err != nil {
+		return "", err
+	}
+
+	// Ensure the PID actually exists, else we'll move ourselves.
+	if containerInfo.State.Pid == 0 {
+		return "", fmt.Errorf("failed to get init PID for Docker container %q", string(id))
+	}
+	if container.Name == PodInfraContainerName {
+		util.ApplyOomScoreAdj(containerInfo.State.Pid, podOomScoreAdj)
+	} else {
+		// Children processes of docker daemon will inheritant the OOM score from docker
+		// daemon process. We explicitly apply OOM score 0 by default to the user
+		// containers to avoid daemons or POD containers are killed by oom killer.
+		util.ApplyOomScoreAdj(containerInfo.State.Pid, userContainerOomScoreAdj)
+	}
+
 	return kubeletTypes.DockerID(id), err
 }
 
@@ -1235,19 +1273,6 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 		return "", err
 	}
 
-	// Set OOM score of POD container to lower than those of the other
-	// containers in the pod. This ensures that it is killed only as a last
-	// resort.
-	containerInfo, err := dm.client.InspectContainer(string(id))
-	if err != nil {
-		return "", err
-	}
-
-	// Ensure the PID actually exists, else we'll move ourselves.
-	if containerInfo.State.Pid == 0 {
-		return "", fmt.Errorf("failed to get init PID for Docker pod infra container %q", string(id))
-	}
-	util.ApplyOomScoreAdj(containerInfo.State.Pid, podOomScoreAdj)
 	return id, nil
 }
 

@@ -16,6 +16,9 @@ limitations under the License.
 
 package kubelet
 
+// Note: if you change code in this file, you might need to change code in
+// contrib/mesos/pkg/executor/.
+
 import (
 	"errors"
 	"fmt"
@@ -88,7 +91,7 @@ type SyncHandler interface {
 	// Syncs current state to match the specified pods. SyncPodType specified what
 	// type of sync is occuring per pod. StartTime specifies the time at which
 	// syncing began (for use in monitoring).
-	SyncPods(pods []*api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType, mirrorPods map[string]*api.Pod,
+	SyncPods(pods []*api.Pod, podSyncTypes map[types.UID]SyncPodType, mirrorPods map[string]*api.Pod,
 		startTime time.Time) error
 }
 
@@ -121,6 +124,7 @@ func NewMainKubelet(
 	containerGCPolicy ContainerGCPolicy,
 	sourcesReady SourcesReadyFn,
 	registerNode bool,
+	standaloneMode bool,
 	clusterDomain string,
 	clusterDNS net.IP,
 	masterServiceNamespace string,
@@ -229,6 +233,7 @@ func NewMainKubelet(
 		httpClient:                     &http.Client{},
 		sourcesReady:                   sourcesReady,
 		registerNode:                   registerNode,
+		standaloneMode:                 standaloneMode,
 		clusterDomain:                  clusterDomain,
 		clusterDNS:                     clusterDNS,
 		serviceLister:                  serviceLister,
@@ -383,6 +388,9 @@ type Kubelet struct {
 
 	// Set to true to have the node register itself with the apiserver.
 	registerNode bool
+
+	// Set to true if the kubelet is in standalone mode (i.e. setup without an apiserver)
+	standaloneMode bool
 
 	// If non-empty, use this for container DNS search.
 	clusterDomain string
@@ -622,6 +630,9 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 }
 
 func (kl *Kubelet) GetNode() (*api.Node, error) {
+	if kl.standaloneMode {
+		return nil, errors.New("no node entry for kubelet in standalone mode")
+	}
 	l, err := kl.nodeLister.List()
 	if err != nil {
 		return nil, errors.New("cannot list nodes")
@@ -1078,7 +1089,7 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 	return nil
 }
 
-func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod) error {
+func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod, updateType SyncPodType) error {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
 
@@ -1130,10 +1141,38 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}
 	kl.volumeManager.SetVolumes(pod.UID, podVolumes)
 
-	podStatus, err := kl.generatePodStatus(pod)
-	if err != nil {
-		glog.Errorf("Unable to get status for pod %q (uid %q): %v", podFullName, uid, err)
-		return err
+	// The kubelet is the source of truth for pod status. It ignores the status sent from
+	// the apiserver and regenerates status for every pod update, incrementally updating
+	// the status it received at pod creation time.
+	//
+	// The container runtime needs 2 pieces of information from the status to sync a pod:
+	// The terminated state of containers (to restart them) and the podIp (for liveness probes).
+	// New pods don't have either, so we skip the expensive status generation step.
+	//
+	// If we end up here with a create event for an already running pod, it could result in a
+	// restart of its containers. This cannot happen unless the kubelet restarts, because the
+	// delete before the second create is processed by SyncPods, which cancels this pod worker.
+	//
+	// If the kubelet restarts, we have a bunch of running containers for which we get create
+	// events. This is ok, because the pod status for these will include the podIp and terminated
+	// status. Any race conditions here effectively boils down to -- the pod worker didn't sync
+	// state of a newly started container with the apiserver before the kubelet restarted, so
+	// it's OK to pretend like the kubelet started them after it restarted.
+	//
+	// Also note that deletes currently have an updateType of `create` set in UpdatePods.
+	// This, again, does not matter because deletes are not processed by this method.
+
+	var podStatus api.PodStatus
+	if updateType == SyncPodCreate {
+		podStatus = pod.Status
+		glog.V(3).Infof("Not generating pod status for new pod %v", podFullName)
+	} else {
+		var err error
+		podStatus, err = kl.generatePodStatus(pod)
+		if err != nil {
+			glog.Errorf("Unable to get status for pod %q (uid %q): %v", podFullName, uid, err)
+			return err
+		}
 	}
 
 	pullSecrets, err := kl.getPullSecretsForPod(pod)
@@ -1306,7 +1345,7 @@ func (kl *Kubelet) filterOutTerminatedPods(allPods []*api.Pod) []*api.Pod {
 }
 
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
-func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType,
+func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]SyncPodType,
 	mirrorPods map[string]*api.Pod, start time.Time) error {
 	defer func() {
 		metrics.SyncPodsLatency.Observe(metrics.SinceInMicroseconds(start))
@@ -1344,7 +1383,7 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]metri
 		})
 
 		// Note the number of containers for new pods.
-		if val, ok := podSyncTypes[pod.UID]; ok && (val == metrics.SyncPodCreate) {
+		if val, ok := podSyncTypes[pod.UID]; ok && (val == SyncPodCreate) {
 			metrics.ContainersPerPodCount.Observe(float64(len(pod.Spec.Containers)))
 		}
 	}
@@ -1486,7 +1525,7 @@ func (kl *Kubelet) checkCapacityExceeded(pods []*api.Pod) (fitting []*api.Pod, n
 }
 
 // handleOutOfDisk detects if pods can't fit due to lack of disk space.
-func (kl *Kubelet) handleOutOfDisk(pods []*api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType) []*api.Pod {
+func (kl *Kubelet) handleOutOfDisk(pods []*api.Pod, podSyncTypes map[types.UID]SyncPodType) []*api.Pod {
 	if len(podSyncTypes) == 0 {
 		// regular sync. no new pods
 		return pods
@@ -1519,7 +1558,7 @@ func (kl *Kubelet) handleOutOfDisk(pods []*api.Pod, podSyncTypes map[types.UID]m
 	for i := range pods {
 		pod := pods[i]
 		// Only reject pods that didn't start yet.
-		if podSyncTypes[pod.UID] == metrics.SyncPodCreate {
+		if podSyncTypes[pod.UID] == SyncPodCreate {
 			kl.recorder.Eventf(pod, "OutOfDisk", "Cannot start the pod due to lack of disk space.")
 			kl.statusManager.SetPodStatus(pod, api.PodStatus{
 				Phase:   api.PodFailed,
@@ -1533,6 +1572,9 @@ func (kl *Kubelet) handleOutOfDisk(pods []*api.Pod, podSyncTypes map[types.UID]m
 
 // checkNodeSelectorMatching detects pods that do not match node's labels.
 func (kl *Kubelet) checkNodeSelectorMatching(pods []*api.Pod) (fitting []*api.Pod, notFitting []*api.Pod) {
+	if kl.standaloneMode {
+		return pods, notFitting
+	}
 	node, err := kl.GetNode()
 	if err != nil {
 		glog.Errorf("error getting node: %v", err)
@@ -1578,7 +1620,7 @@ func (kl *Kubelet) handleNotFittingPods(pods []*api.Pod) []*api.Pod {
 
 // admitPods handles pod admission. It filters out terminated pods, and pods
 // that don't fit on the node, and may reject pods if node is overcommitted.
-func (kl *Kubelet) admitPods(allPods []*api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType) []*api.Pod {
+func (kl *Kubelet) admitPods(allPods []*api.Pod, podSyncTypes map[types.UID]SyncPodType) []*api.Pod {
 	// Pod phase progresses monotonically. Once a pod has reached a final state,
 	// it should never leave irregardless of the restart policy. The statuses
 	// of such pods should not be changed, and there is no need to sync them.
@@ -1616,7 +1658,7 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 	glog.Info("Starting kubelet main sync loop.")
 	for {
 		unsyncedPod := false
-		podSyncTypes := make(map[types.UID]metrics.SyncPodType)
+		podSyncTypes := make(map[types.UID]SyncPodType)
 		select {
 		case u, ok := <-updates:
 			if !ok {
@@ -1960,8 +2002,10 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	return err
 }
 
-// getPhase returns the phase of a pod given its container info.
-func getPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
+// GetPhase returns the phase of a pod given its container info.
+// This func is exported to simplify integration with 3rd party kubelet
+// integrations like kubernetes-mesos.
+func GetPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 	running := 0
 	waiting := 0
 	stopped := 0
@@ -2080,7 +2124,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	}
 
 	// Assume info is ready to process
-	podStatus.Phase = getPhase(spec, podStatus.ContainerStatuses)
+	podStatus.Phase = GetPhase(spec, podStatus.ContainerStatuses)
 	for _, c := range spec.Containers {
 		for i, st := range podStatus.ContainerStatuses {
 			if st.Name == c.Name {
@@ -2093,11 +2137,13 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 
 	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses)...)
 
-	hostIP, err := kl.GetHostIP()
-	if err != nil {
-		glog.Errorf("Cannot get host IP: %v", err)
-	} else {
-		podStatus.HostIP = hostIP.String()
+	if !kl.standaloneMode {
+		hostIP, err := kl.GetHostIP()
+		if err != nil {
+			glog.V(4).Infof("Cannot get host IP: %v", err)
+		} else {
+			podStatus.HostIP = hostIP.String()
+		}
 	}
 
 	return *podStatus, nil

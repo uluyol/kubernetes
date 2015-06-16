@@ -23,7 +23,7 @@ source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 
 case "${KUBE_OS_DISTRIBUTION}" in
-  ubuntu|coreos)
+  ubuntu|wheezy|coreos)
     source "${KUBE_ROOT}/cluster/aws/${KUBE_OS_DISTRIBUTION}/util.sh"
     ;;
   *)
@@ -172,10 +172,34 @@ function detect-security-groups {
 }
 
 # Detects the AMI to use (considering the region)
+# This really should be in the various distro-specific util functions,
+# but CoreOS uses this for the master, so for now it is here.
+#
+# TODO: Remove this and just have each distro implement detect-image
 #
 # Vars set:
 #   AWS_IMAGE
 function detect-image () {
+case "${KUBE_OS_DISTRIBUTION}" in
+  ubuntu|coreos)
+    detect-ubuntu-image
+    ;;
+  wheezy)
+    detect-wheezy-image
+    ;;
+  *)
+    echo "Please specify AWS_IMAGE directly (distro not recognized)"
+    exit 2
+    ;;
+esac
+}
+
+# Detects the AMI to use for ubuntu (considering the region)
+# Used by CoreOS & Ubuntu
+#
+# Vars set:
+#   AWS_IMAGE
+function detect-ubuntu-image () {
   # This is the ubuntu 14.04 image for <region>, amd64, hvm:ebs-ssd
   # See here: http://cloud-images.ubuntu.com/locator/ec2/ for other images
   # This will need to be updated from time to time as amis are deprecated
@@ -358,6 +382,8 @@ function upload-server-tars() {
   SERVER_BINARY_TAR_URL=
   SALT_TAR_URL=
 
+  ensure-temp-dir
+
   if [[ -z ${AWS_S3_BUCKET-} ]]; then
       local project_hash=
       local key=$(aws configure get aws_access_key_id)
@@ -447,12 +473,11 @@ function add-tag {
   echo "Adding tag to ${1}: ${2}=${3}"
 
   # We need to retry in case the resource isn't yet fully created
-  sleep 3
   n=0
-  until [ $n -ge 5 ]; do
+  until [ $n -ge 25 ]; do
     $AWS_CMD create-tags --resources ${1} --tags Key=${2},Value=${3} > $LOG && return
     n=$[$n+1]
-    sleep 15
+    sleep 3
   done
 
   echo "Unable to add tag to AWS resource"
@@ -610,11 +635,21 @@ function kube-up {
   echo "Using Internet Gateway $IGW_ID"
 
   echo "Associating route table."
-  ROUTE_TABLE_ID=$($AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID | json_val '["RouteTables"][0]["RouteTableId"]')
+  ROUTE_TABLE_ID=$($AWS_CMD --output text describe-route-tables \
+                            --filters Name=vpc-id,Values=${VPC_ID} \
+                                      Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                            --query RouteTables[].RouteTableId)
+  if [[ -z "${ROUTE_TABLE_ID}" ]]; then
+    echo "Creating route table"
+    ROUTE_TABLE_ID=$($AWS_CMD --output text create-route-table \
+                              --vpc-id=${VPC_ID} \
+                              --query RouteTable.RouteTableId)
+    add-tag ${ROUTE_TABLE_ID} KubernetesCluster ${CLUSTER_ID}
+  fi
+
+  echo "Associating route table ${ROUTE_TABLE_ID} to subnet ${SUBNET_ID}"
   $AWS_CMD associate-route-table --route-table-id $ROUTE_TABLE_ID --subnet-id $SUBNET_ID > $LOG || true
-  echo "Configuring route table."
-  $AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID > $LOG || true
-  echo "Adding route to route table."
+  echo "Adding route to route table ${ROUTE_TABLE_ID}"
   $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID > $LOG || true
 
   echo "Using Route Table $ROUTE_TABLE_ID"
@@ -742,7 +777,7 @@ function kube-up {
     echo -n Attempt "$(($attempt+1))" to check for SSH to master
     local output
     local ok=1
-    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} uptime 2> $LOG) || ok=0
+    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} uptime 2> $LOG) || ok=0
     if [[ ${ok} == 0 ]]; then
       if (( attempt > 30 )); then
         echo
@@ -768,7 +803,7 @@ function kube-up {
     echo -n Attempt "$(($attempt+1))" to check for salt-master
     local output
     local ok=1
-    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} pgrep salt-master 2> $LOG) || ok=0
+    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} pgrep salt-master 2> $LOG) || ok=0
     if [[ ${ok} == 0 ]]; then
       if (( attempt > 30 )); then
         echo
@@ -854,7 +889,7 @@ function kube-up {
     sleep 10
   done
   echo "Re-running salt highstate"
-  ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo salt '*' state.highstate > $LOG
+  ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} sudo salt '*' state.highstate > $LOG
 
   echo "Waiting for cluster initialization."
   echo
@@ -883,9 +918,9 @@ function kube-up {
   # config file.  Distribute the same way the htpasswd is done.
   (
     umask 077
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "ubuntu@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>"$LOG"
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "ubuntu@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>"$LOG"
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "ubuntu@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>"$LOG"
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>"$LOG"
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>"$LOG"
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>"$LOG"
 
     create-kubeconfig
   )
@@ -1040,6 +1075,14 @@ function kube-down {
     for route_table_id in ${route_table_ids}; do
       $AWS_CMD delete-route --route-table-id $route_table_id --destination-cidr-block 0.0.0.0/0 > $LOG
     done
+    route_table_ids=$($AWS_CMD --output text describe-route-tables \
+                               --filters Name=vpc-id,Values=$vpc_id \
+                                         Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
+                               --query RouteTables[].RouteTableId \
+                      | tr "\t" "\n")
+    for route_table_id in ${route_table_ids}; do
+      $AWS_CMD delete-route-table --route-table-id $route_table_id > $LOG
+    done
 
     $AWS_CMD delete-vpc --vpc-id $vpc_id > $LOG
   fi
@@ -1064,7 +1107,7 @@ function kube-push {
     echo "echo Executing configuration"
     echo "sudo salt '*' mine.update"
     echo "sudo salt --force-color '*' state.highstate"
-  ) | ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo bash
+  ) | ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${KUBE_MASTER_IP} sudo bash
 
   get-password
 
@@ -1130,7 +1173,7 @@ function ssh-to-node {
   fi
 
   for try in $(seq 1 5); do
-    if ssh -oLogLevel=quiet -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${ip} "${cmd}"; then
+    if ssh -oLogLevel=quiet -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${ip} "${cmd}"; then
       break
     fi
   done

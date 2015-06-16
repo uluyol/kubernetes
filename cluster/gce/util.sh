@@ -35,6 +35,10 @@ ALLOCATE_NODE_CIDRS=true
 
 KUBE_PROMPT_FOR_UPDATE=y
 KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
+# Suffix to append to the staging path used for the server tars. Useful if
+# multiple versions of the server are being used in the same project
+# simultaneously (e.g. on Jenkins).
+KUBE_GCS_STAGING_PATH_SUFFIX=${KUBE_GCS_STAGING_PATH_SUFFIX-""}
 
 # VERSION_REGEX matches things like "v0.13.1"
 readonly KUBE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
@@ -214,7 +218,7 @@ function upload-server-tars() {
     gsutil mb "${staging_bucket}"
   fi
 
-  local -r staging_path="${staging_bucket}/devel"
+  local -r staging_path="${staging_bucket}/devel${KUBE_GCS_STAGING_PATH_SUFFIX}"
 
   local server_hash
   local salt_hash
@@ -400,9 +404,12 @@ function create-node-template {
   # TODO(mbforbes): To make this really robust, we need to parse the output and
   #                 add retries. Just relying on a non-zero exit code doesn't
   #                 distinguish an ephemeral failed call from a "not-exists".
-  if gcloud compute instance-templates describe "$1" &>/dev/null; then
-    echo "Instance template ${1} already exists; continuing." >&2
-    return
+  if gcloud compute instance-templates describe "$1" --project "${PROJECT}" &>/dev/null; then
+    echo "Instance template ${1} already exists; deleting." >&2
+    if ! gcloud compute instance-templates delete "$1" --project "${PROJECT}" &>/dev/null; then
+      echo -e "${color_yellow}Failed to delete existing instance template${color_norm}" >&2
+      exit 2
+    fi
   fi
 
   local attempt=0
@@ -550,6 +557,8 @@ function create-certs {
     exit 2
   }
   CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
+  # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
+  # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
   CA_CERT_BASE64=$(cat "${CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
   MASTER_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/${MASTER_NAME}.crt" | base64 | tr -d '\r\n')
   MASTER_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/${MASTER_NAME}.key" | base64 | tr -d '\r\n')
@@ -733,7 +742,7 @@ function kube-down {
 
   # The gcloud APIs don't return machine parsable error codes/retry information. Therefore the best we can
   # do is parse the output and special case particular responses we are interested in.
-  if gcloud preview managed-instance-groups --zone "${ZONE}" describe "${NODE_INSTANCE_PREFIX}-group" &>/dev/null; then
+  if gcloud preview managed-instance-groups --project "${PROJECT}" --zone "${ZONE}" describe "${NODE_INSTANCE_PREFIX}-group" &>/dev/null; then
     deleteCmdOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" delete \
       --project "${PROJECT}" \
       --quiet \
@@ -746,7 +755,7 @@ function kube-down {
         while [[ "$deleteCmdStatus" != "DONE" ]]
         do
           sleep 5
-          deleteCmdOperationOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" get-operation $deleteCmdOperationId)
+          deleteCmdOperationOutput=$(gcloud preview managed-instance-groups --zone "${ZONE}" --project "${PROJECT}" get-operation $deleteCmdOperationId)
           deleteCmdStatus=$(echo $deleteCmdOperationOutput | grep -i "status:" | sed "s/.*status:[[:space:]]*\([^[:space:]]*\).*/\1/g")
           echo "Waiting for MIG deletion to complete. Current status: " $deleteCmdStatus
         done
@@ -754,7 +763,7 @@ function kube-down {
     fi
   fi
 
-  if gcloud compute instance-templates describe "${NODE_INSTANCE_PREFIX}-template" &>/dev/null; then
+  if gcloud compute instance-templates describe --project "${PROJECT}" "${NODE_INSTANCE_PREFIX}-template" &>/dev/null; then
     gcloud compute instance-templates delete \
       --project "${PROJECT}" \
       --quiet \
@@ -762,7 +771,7 @@ function kube-down {
   fi
 
   # First delete the master (if it exists).
-  if gcloud compute instances describe "${MASTER_NAME}" --zone "${ZONE}" &>/dev/null; then
+  if gcloud compute instances describe "${MASTER_NAME}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
     gcloud compute instances delete \
       --project "${PROJECT}" \
       --quiet \
@@ -772,7 +781,7 @@ function kube-down {
   fi
 
   # Delete the master pd (possibly leaked by kube-up if master create failed).
-  if gcloud compute disks describe "${MASTER_NAME}"-pd --zone "${ZONE}" &>/dev/null; then
+  if gcloud compute disks describe "${MASTER_NAME}"-pd --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
     gcloud compute disks delete \
       --project "${PROJECT}" \
       --quiet \
@@ -799,7 +808,7 @@ function kube-down {
   done
 
   # Delete firewall rule for the master.
-  if gcloud compute firewall-rules describe "${MASTER_NAME}-https" &>/dev/null; then
+  if gcloud compute firewall-rules describe --project "${PROJECT}" "${MASTER_NAME}-https" &>/dev/null; then
     gcloud compute firewall-rules delete  \
       --project "${PROJECT}" \
       --quiet \
@@ -807,7 +816,7 @@ function kube-down {
   fi
 
   # Delete firewall rule for minions.
-  if gcloud compute firewall-rules describe "${MINION_TAG}-all" &>/dev/null; then
+  if gcloud compute firewall-rules describe "${PROJECT}" "${MINION_TAG}-all" &>/dev/null; then
     gcloud compute firewall-rules delete  \
       --project "${PROJECT}" \
       --quiet \
@@ -831,7 +840,7 @@ function kube-down {
 
   # Delete the master's reserved IP
   local REGION=${ZONE%-*}
-  if gcloud compute addresses describe "${MASTER_NAME}-ip" --region "${REGION}" &>/dev/null; then
+  if gcloud compute addresses describe "${MASTER_NAME}-ip" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
     gcloud compute addresses delete \
       --project "${PROJECT}" \
       --region "${REGION}" \
@@ -978,21 +987,37 @@ function test-setup {
 
   # Open up port 80 & 8080 so common containers on minions can be reached
   # TODO(roberthbailey): Remove this once we are no longer relying on hostPorts.
+  local start=`date +%s`
   gcloud compute firewall-rules create \
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG}" \
     --allow tcp:80,tcp:8080 \
     --network "${NETWORK}" \
-    "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt"
+    "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || true
+  # As there is no simple way to wait longer for this operation we need to manually
+  # wait some additional time (20 minutes altogether).
+  until gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
+  do sleep 5
+  done
+  # Check if the firewall rule exists and fail if it does not.
+  gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt"
 
   # Open up the NodePort range
   # TODO(justinsb): Move to main setup, if we decide whether we want to do this by default.
+  start=`date +%s`
   gcloud compute firewall-rules create \
     --project "${PROJECT}" \
     --target-tags "${MINION_TAG}" \
     --allow tcp:30000-32767,udp:30000-32767 \
     --network "${NETWORK}" \
-    "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports"
+    "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || true
+  # As there is no simple way to wait longer for this operation we need to manually
+  # wait some additional time (20 minutes altogether).
+  until gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports" 2> /dev/null || [ $(($start + 1200)) -lt `date +%s` ]
+  do sleep 5
+  done
+  # Check if the firewall rule exists and fail if it does not.
+  gcloud compute firewall-rules describe --project "${PROJECT}" "${MINION_TAG}-${INSTANCE_PREFIX}-nodeports"
 }
 
 # Execute after running tests to perform any required clean-up. This is called

@@ -583,6 +583,8 @@ func replaceProber(dm *DockerManager, result probe.Result, err error) {
 // delay has passed, whether the probe handler will return Success, Failure,
 // Unknown or error.
 //
+// PLEASE READ THE PROBE DOCS BEFORE CHANGING THIS TEST IF YOU ARE UNSURE HOW PROBES ARE SUPPOSED TO WORK:
+// (See https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pod-states.md#pod-conditions)
 func TestProbeContainer(t *testing.T) {
 	manager, _ := newTestDockerManager()
 	dc := &docker.APIContainers{
@@ -601,7 +603,7 @@ func TestProbeContainer(t *testing.T) {
 			expectedResult:    probe.Success,
 			expectedReadiness: true,
 		},
-		// Only LivenessProbe.
+		// Only LivenessProbe. expectedReadiness should always be true here.
 		{
 			testContainer: api.Container{
 				LivenessProbe: &api.Probe{InitialDelaySeconds: 100},
@@ -614,7 +616,7 @@ func TestProbeContainer(t *testing.T) {
 				LivenessProbe: &api.Probe{InitialDelaySeconds: -100},
 			},
 			expectedResult:    probe.Unknown,
-			expectedReadiness: false,
+			expectedReadiness: true,
 		},
 		{
 			testContainer: api.Container{
@@ -626,7 +628,7 @@ func TestProbeContainer(t *testing.T) {
 				},
 			},
 			expectedResult:    probe.Failure,
-			expectedReadiness: false,
+			expectedReadiness: true,
 		},
 		{
 			testContainer: api.Container{
@@ -650,7 +652,7 @@ func TestProbeContainer(t *testing.T) {
 				},
 			},
 			expectedResult:    probe.Unknown,
-			expectedReadiness: false,
+			expectedReadiness: true,
 		},
 		{
 			testContainer: api.Container{
@@ -663,21 +665,21 @@ func TestProbeContainer(t *testing.T) {
 			},
 			expectError:       true,
 			expectedResult:    probe.Unknown,
-			expectedReadiness: false,
+			expectedReadiness: true,
 		},
-		// Only ReadinessProbe.
+		// // Only ReadinessProbe. expectedResult should always be probe.Success here.
 		{
 			testContainer: api.Container{
 				ReadinessProbe: &api.Probe{InitialDelaySeconds: 100},
 			},
-			expectedResult:    probe.Failure,
+			expectedResult:    probe.Success,
 			expectedReadiness: false,
 		},
 		{
 			testContainer: api.Container{
 				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
 			},
-			expectedResult:    probe.Unknown,
+			expectedResult:    probe.Success,
 			expectedReadiness: false,
 		},
 		{
@@ -735,7 +737,7 @@ func TestProbeContainer(t *testing.T) {
 				LivenessProbe:  &api.Probe{InitialDelaySeconds: 100},
 				ReadinessProbe: &api.Probe{InitialDelaySeconds: 100},
 			},
-			expectedResult:    probe.Failure,
+			expectedResult:    probe.Success,
 			expectedReadiness: false,
 		},
 		{
@@ -743,7 +745,7 @@ func TestProbeContainer(t *testing.T) {
 				LivenessProbe:  &api.Probe{InitialDelaySeconds: 100},
 				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
 			},
-			expectedResult:    probe.Unknown,
+			expectedResult:    probe.Success,
 			expectedReadiness: false,
 		},
 		{
@@ -816,16 +818,16 @@ func TestProbeContainer(t *testing.T) {
 		}
 		result, err := manager.prober.Probe(&api.Pod{}, api.PodStatus{}, test.testContainer, dc.ID, dc.Created)
 		if test.expectError && err == nil {
-			t.Error("[%d] Expected error but did no error was returned.", i)
+			t.Error("[%d] Expected error but no error was returned.", i)
 		}
 		if !test.expectError && err != nil {
-			t.Errorf("[%d] Expected error but got: %v", i, err)
+			t.Errorf("[%d] Didn't expect error but got: %v", i, err)
 		}
 		if test.expectedResult != result {
-			t.Errorf("[%d] Expected result was %v but probeContainer() returned %v", i, test.expectedResult, result)
+			t.Errorf("[%d] Expected result to be %v but was %v", i, test.expectedResult, result)
 		}
 		if test.expectedReadiness != manager.readinessManager.GetReadiness(dc.ID) {
-			t.Errorf("[%d] Expected readiness was %v but probeContainer() set %v", i, test.expectedReadiness, manager.readinessManager.GetReadiness(dc.ID))
+			t.Errorf("[%d] Expected readiness to be %v but was %v", i, test.expectedReadiness, manager.readinessManager.GetReadiness(dc.ID))
 		}
 	}
 }
@@ -896,7 +898,7 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 		// Create pod infra container.
 		"create", "start", "inspect_container",
 		// Create container.
-		"create", "start",
+		"create", "start", "inspect_container",
 	})
 
 	fakeDocker.Lock()
@@ -945,7 +947,7 @@ func TestSyncPodCreatesNetAndContainerPullsImage(t *testing.T) {
 		// Create pod infra container.
 		"create", "start", "inspect_container",
 		// Create container.
-		"create", "start",
+		"create", "start", "inspect_container",
 	})
 
 	fakeDocker.Lock()
@@ -997,7 +999,7 @@ func TestSyncPodWithPodInfraCreatesContainer(t *testing.T) {
 		// Inspect pod infra container (but does not create)"
 		"inspect_container",
 		// Create container.
-		"create", "start",
+		"create", "start", "inspect_container",
 	})
 
 	fakeDocker.Lock()
@@ -1038,7 +1040,7 @@ func TestSyncPodDeletesWithNoPodInfraContainer(t *testing.T) {
 		// Create pod infra container.
 		"create", "start", "inspect_container",
 		// Create container.
-		"create", "start",
+		"create", "start", "inspect_container",
 	})
 
 	// A map iteration is used to delete containers, so must not depend on
@@ -1163,7 +1165,7 @@ func TestSyncPodBadHash(t *testing.T) {
 		// Check the pod infra container.
 		"inspect_container",
 		// Kill and restart the bad hash container.
-		"inspect_container", "stop", "create", "start",
+		"inspect_container", "stop", "create", "start", "inspect_container",
 	})
 
 	if err := fakeDocker.AssertStopped([]string{"1234"}); err != nil {
@@ -1223,7 +1225,7 @@ func TestSyncPodsUnhealthy(t *testing.T) {
 		// Kill the unhealthy container.
 		"inspect_container", "stop",
 		// Restart the unhealthy container.
-		"create", "start",
+		"create", "start", "inspect_container",
 	})
 
 	if err := fakeDocker.AssertStopped([]string{"1234"}); err != nil {
@@ -1408,7 +1410,7 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 				// Check the pod infra container.
 				"inspect_container",
 				// Restart both containers.
-				"create", "start", "create", "start",
+				"create", "start", "inspect_container", "create", "start", "inspect_container",
 			},
 			[]string{"succeeded", "failed"},
 			[]string{},
@@ -1419,7 +1421,7 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 				// Check the pod infra container.
 				"inspect_container",
 				// Restart the failed container.
-				"create", "start",
+				"create", "start", "inspect_container",
 			},
 			[]string{"failed"},
 			[]string{},
@@ -1832,7 +1834,7 @@ func TestSyncPodWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 		// Check the pod infra container.
 		"inspect_container",
 		// Create container.
-		"create", "start",
+		"create", "start", "inspect_container",
 	})
 
 	fakeDocker.Lock()

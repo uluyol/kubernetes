@@ -29,7 +29,7 @@ FE="1"                # amount of Web server
 LG="1"                # amount of load generators
 SLAVE="1"             # amount of redis slaves 
 TEST="1"              # 0 = Dont run tests, 1 = Do run tests.
-NS="k8petstore"       # namespace
+NS="default"       # namespace
 
 kubectl="${1:-$kubectl}"
 VERSION="${2:-$VERSION}"
@@ -47,7 +47,7 @@ function create {
 cat << EOF > fe-rc.json
 {
   "kind": "ReplicationController",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "fectrl",
     "labels": {"name": "frontend"}
@@ -76,7 +76,7 @@ EOF
 cat << EOF > bps-load-gen-rc.json
 {
   "kind": "ReplicationController",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "bpsloadgenrc",
     "labels": {"name": "bpsLoadGenController"}
@@ -106,7 +106,7 @@ EOF
 cat << EOF > fe-s.json
 {
   "kind": "Service",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "frontend",
     "labels": {
@@ -117,7 +117,7 @@ cat << EOF > fe-s.json
     "ports": [{
       "port": 3000
     }],
-    "publicIPs":["$PUBLIC_IP","10.1.4.89"],
+    "deprecatedPublicIPs":["$PUBLIC_IP","10.1.4.89"],
     "selector": {
       "name": "frontend"
     }
@@ -128,7 +128,7 @@ EOF
 cat << EOF > rm.json
 {
   "kind": "Pod",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "redismaster",
     "labels": {
@@ -150,7 +150,7 @@ EOF
 cat << EOF > rm-s.json
 {
   "kind": "Service",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "redismaster",
     "labels": {
@@ -171,7 +171,7 @@ EOF
 cat << EOF > rs-s.json
 {
   "kind": "Service",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "redisslave",
     "labels": {
@@ -192,7 +192,7 @@ EOF
 cat << EOF > slave-rc.json
 {
   "kind": "ReplicationController",
-  "apiVersion": "v1beta3",
+  "apiVersion": "v1",
   "metadata": {
     "name": "redissc",
     "labels": {"name": "redisslave"}
@@ -270,6 +270,16 @@ function tests {
         sleep 1
   done
 }
+
+function warning {
+  echo ""
+  echo "THIS SCRIPT IS FOR KUBERNETES < v1."
+  echo "For LATER VERSIONS, use k8petstore-nodeport.sh or k8petstore-loadbalacer.sh!!!!"
+  echo "In particular PublicIP is DEPRECATED in post-v1 releases!!!"
+  echo ""
+}
+
+warning
 
 create
 

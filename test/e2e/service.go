@@ -808,7 +808,8 @@ var _ = Describe("Services", func() {
 })
 
 func waitForLoadBalancerIngress(c *client.Client, serviceName, namespace string) (*api.Service, error) {
-	const timeout = 4 * time.Minute
+	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
+	const timeout = 20 * time.Minute
 	var service *api.Service
 	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to have a LoadBalancer ingress point", timeout, serviceName, namespace))
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
@@ -826,7 +827,8 @@ func waitForLoadBalancerIngress(c *client.Client, serviceName, namespace string)
 }
 
 func waitForLoadBalancerDestroy(c *client.Client, serviceName, namespace string) (*api.Service, error) {
-	const timeout = 4 * time.Minute
+	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
+	const timeout = 10 * time.Minute
 	var service *api.Service
 	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to have no LoadBalancer ingress points", timeout, serviceName, namespace))
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
@@ -1142,7 +1144,7 @@ func (t *WebserverTest) BuildServiceSpec() *api.Service {
 }
 
 // Create a pod with the well-known webserver configuration, and record it for cleanup
-func (t *WebserverTest) CreateWebserverPod() {
+func (t *WebserverTest) CreateWebserverPod() *api.Pod {
 	name := t.ServiceName + "-" + strconv.Itoa(t.SequenceNext())
 	pod := &api.Pod{
 		TypeMeta: api.TypeMeta{
@@ -1162,11 +1164,12 @@ func (t *WebserverTest) CreateWebserverPod() {
 			},
 		},
 	}
-	_, err := t.CreatePod(pod)
+	pod, err := t.CreatePod(pod)
 	if err != nil {
 		Failf("Failed to create pod %s: %v", pod.Name, err)
 	}
 	expectNoError(waitForPodRunningInNamespace(t.Client, pod.Name, t.Namespace))
+	return pod
 }
 
 // Create a pod, and record it for cleanup

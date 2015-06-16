@@ -79,11 +79,11 @@ func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 	}
 	apiVersion := fields["apiVersion"]
 	if apiVersion == nil {
-		fmt.Errorf("apiVersion not set")
+		return fmt.Errorf("apiVersion not set")
 	}
 	kind := fields["kind"]
 	if kind == nil {
-		fmt.Errorf("kind not set")
+		return fmt.Errorf("kind not set")
 	}
 	return s.ValidateObject(obj, apiVersion.(string), "", apiVersion.(string)+"."+kind.(string))
 }
@@ -157,7 +157,6 @@ func (s *SwaggerSchema) validateField(value interface{}, apiVersion, fieldName, 
 			return NewInvalidTypeError(reflect.Array, reflect.TypeOf(value).Kind(), fieldName)
 		}
 		var arrType string
-		glog.Infof("field detail %v", fieldDetails)
 		if fieldDetails.Items.Ref == nil && fieldDetails.Items.Type == nil {
 			return NewInvalidTypeError(reflect.Array, reflect.TypeOf(value).Kind(), fieldName)
 		}
