@@ -96,9 +96,9 @@ type Config struct {
 	// allow downstream consumers to disable swagger
 	EnableSwaggerSupport bool
 	// allow api versions to be conditionally disabled
-	DisableV1Beta3     bool
-	DisableV1          bool
-	EnableExperimental bool
+	DisableV1Beta3      bool
+	DisableV1           bool
+	DisableExperimental bool
 	// allow downstream consumers to disable the index route
 	EnableIndex           bool
 	EnableProfiling       bool
@@ -195,8 +195,7 @@ type Master struct {
 	masterServices       *util.Runner
 
 	// storage contains the RESTful endpoints exposed by this master
-	storage             map[string]rest.Storage
-	experimentalStorage map[string]rest.Storage
+	storage map[string]rest.Storage
 
 	// registries are internal client APIs for accessing the storage layer
 	// TODO: define the internal typed interface in a way that clients can
@@ -334,7 +333,7 @@ func New(c *Config) *Master {
 		admissionControl:      c.AdmissionControl,
 		v1beta3:               !c.DisableV1Beta3,
 		v1:                    !c.DisableV1,
-		experimental:          c.EnableExperimental,
+		experimental:          !c.DisableExperimental,
 		requestContextMapper:  c.RequestContextMapper,
 
 		cacheTimeout: c.CacheTimeout,
