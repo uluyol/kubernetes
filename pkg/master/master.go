@@ -69,6 +69,7 @@ import (
 	etcdallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator/etcd"
 	ipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
 	serviceaccountetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/serviceaccount/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -528,10 +529,10 @@ func (m *Master) init(c *Config) {
 		}
 	}
 
-	if err := m.installCoreAPIPrefix(c); err != nil {
+	if err := m.installCoreAPIPrefix(c, proxyDialer); err != nil {
 		glog.Fatal(err)
 	}
-	if err := m.installExperimentalAPIPrefix(c); err != nil {
+	if err := m.installExperimentalAPIPrefix(c, proxyDialer); err != nil {
 		glog.Fatal(err)
 	}
 
@@ -697,7 +698,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 	return serversToValidate
 }
 
-func (m *Master) installCoreAPIPrefix(c *Config) error {
+func (m *Master) installCoreAPIPrefix(c *Config, proxyDialer func(net, addr string) (net.Conn, error)) error {
 	defaultVersion := apiserver.APIGroupVersion{
 		Root: m.apiPrefix,
 
@@ -730,17 +731,17 @@ func (m *Master) installCoreAPIPrefix(c *Config) error {
 		if err := makeVersion("v1beta3", v1beta3.Codec).InstallREST(m.handlerContainer, proxyDialer); err != nil {
 			return fmt.Errorf("Unable to setup API v1beta3: %v", err)
 		}
-		coreAPIVersions = append(apiVersions, "v1beta3")
+		coreAPIVersions = append(coreAPIVersions, "v1beta3")
 	}
 	if m.v1 {
 		if err := makeVersion("v1", v1.Codec).InstallREST(m.handlerContainer, proxyDialer); err != nil {
 			return fmt.Errorf("Unable to setup API v1: %v", err)
 		}
-		coreAPIVersions = append(apiVersions, "v1")
+		coreAPIVersions = append(coreAPIVersions, "v1")
 	}
 	apiserver.InstallSupport(m.muxHelper, m.rootWebService)
-	apiserver.AddApiWebService(m.handlerContainer.Container, c.APIPrefix, apiVersions)
-	requestInfoResolver := apiserver.APIRequestInfoResolver{
+	apiserver.AddApiWebService(m.handlerContainer.Container, c.APIPrefix, coreAPIVersions)
+	requestInfoResolver := &apiserver.APIRequestInfoResolver{
 		util.NewStringSet(strings.TrimPrefix(defaultVersion.Root, "/")),
 		defaultVersion.Mapper,
 	}
@@ -748,7 +749,7 @@ func (m *Master) installCoreAPIPrefix(c *Config) error {
 	return nil
 }
 
-func (m *Master) installExperimentalAPIPrefix(c *Config) error {
+func (m *Master) installExperimentalAPIPrefix(c *Config, proxyDialer func(net, addr string) (net.Conn, error)) error {
 	if m.experimental || true { // TODO: remove the true
 		storage := map[string]rest.Storage{
 			"hello": helloetcd.NewStorage(c.EtcdHelper),
@@ -773,7 +774,7 @@ func (m *Master) installExperimentalAPIPrefix(c *Config) error {
 			return fmt.Errorf("Unable to setup experimental API: %v", err)
 		}
 		versions := []string{experimental.Version}
-		apiserver.AddApiWebService(m.handlerContainer.Container, "/experimental", expVersions)
+		apiserver.AddApiWebService(m.handlerContainer.Container, "/experimental", versions)
 		requestInfoResolver := &apiserver.APIRequestInfoResolver{
 			util.NewStringSet(strings.TrimPrefix(version.Root, "/")),
 			version.Mapper,
