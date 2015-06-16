@@ -531,6 +531,9 @@ func (m *Master) init(c *Config) {
 	if err := m.installCoreAPIPrefix(c); err != nil {
 		glog.Fatal(err)
 	}
+	if err := m.installExperimentalAPIPrefix(c); err != nil {
+		glog.Fatal(err)
+	}
 
 	// Register root handler.
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
@@ -742,7 +745,10 @@ func (m *Master) installCoreAPIPrefix(c *Config) error {
 		defaultVersion.Mapper,
 	}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer.Container, requestInfoResolver, coreAPIVersions)
+	return nil
+}
 
+func (m *Master) installExperimentalAPIPrefix(c *Config) error {
 	if m.experimental || true { // TODO: remove the true
 		storage := map[string]rest.Storage{
 			"hello": helloetcd.NewStorage(c.EtcdHelper),
