@@ -529,38 +529,8 @@ func (m *Master) init(c *Config) {
 		}
 	}
 
-	apiVersions := []string{}
-	if m.v1beta3 {
-		if err := m.api_v1beta3().InstallREST(m.handlerContainer, proxyDialer); err != nil {
-			glog.Fatalf("Unable to setup API v1beta3: %v", err)
-		}
-		apiVersions = append(apiVersions, "v1beta3")
-	}
-	if m.v1 {
-		if err := m.api_v1().InstallREST(m.handlerContainer, proxyDialer); err != nil {
-			glog.Fatalf("Unable to setup API v1: %v", err)
-		}
-		apiVersions = append(apiVersions, "v1")
-	}
-
-	apiserver.InstallSupport(m.muxHelper, m.rootWebService)
-	apiserver.AddApiWebService(m.handlerContainer.Container, c.APIPrefix, apiVersions)
-	defaultVersion := m.defaultAPIGroupVersion()
-	requestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(defaultVersion.Root, "/")), defaultVersion.Mapper}
-	apiserver.InstallServiceErrorHandler(m.handlerContainer.Container, requestInfoResolver, apiVersions)
-
-	if m.experimental || true {
-		m.experimentalStorage = map[string]rest.Storage{
-			"hello": helloetcd.NewStorage(c.EtcdHelper),
-		}
-		if err := m.experimental_v0().InstallREST(m.handlerContainer, proxyDialer); err != nil {
-			glog.Fatalf("Unable to setup experimental API: %v", err)
-		}
-		expVersions := []string{experimental.Version}
-		apiserver.AddApiWebService(m.handlerContainer.Container, "/experimental", expVersions)
-		expVersion := m.experimentalAPIGroupVersion()
-		expRequestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(expVersion.Root, "/")), expVersion.Mapper}
-		apiserver.InstallServiceErrorHandler(m.handlerContainer.Container, expRequestInfoResolver, expVersions)
+	if err := m.installCoreAPIPrefix(c); err != nil {
+		glog.Fatal(err)
 	}
 
 	// Register root handler.
@@ -725,8 +695,8 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 	return serversToValidate
 }
 
-func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
-	return &apiserver.APIGroupVersion{
+func (m *Master) installCoreAPIPrefix(c *Config) error {
+	defaultVersion := apiserver.APIGroupVersion{
 		Root: m.apiPrefix,
 
 		Mapper: latest.RESTMapper,
@@ -739,62 +709,73 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,
 	}
-}
-
-func (m *Master) experimentalAPIGroupVersion() *apiserver.APIGroupVersion {
-	return &apiserver.APIGroupVersion{
-		Root:   "/experimental",
-		Mapper: experimental.RESTMapper, // TODO: FIXME
-
-		Creater:   experimental.Scheme,
-		Convertor: experimental.Scheme,
-		Typer:     experimental.Scheme,
-		Linker:    experimental.SelfLinker, // TODO: FIXME
-
-		Admit:   m.admissionControl,
-		Context: m.requestContextMapper,
-	}
-}
-
-// api_v1beta3 returns the resources and codec for API version v1beta3.
-func (m *Master) api_v1beta3() *apiserver.APIGroupVersion {
-	storage := make(map[string]rest.Storage)
-	for k, v := range m.storage {
-		if k == "minions" || k == "minions/status" {
-			continue
+	makeVersion := func(versionName string, codec runtime.Codec) *apiserver.APIGroupVersion {
+		storage := make(map[string]rest.Storage)
+		for k, v := range m.storage {
+			if k == "minions" || k == "minions/status" {
+				continue
+			}
+			storage[strings.ToLower(k)] = v
 		}
-		storage[strings.ToLower(k)] = v
+		version := defaultVersion
+		version.Storage = storage
+		version.Version = versionName
+		version.Codec = codec
+		return &version
 	}
-	version := m.defaultAPIGroupVersion()
-	version.Storage = storage
-	version.Version = "v1beta3"
-	version.Codec = v1beta3.Codec
-	return version
-}
-
-// api_v1 returns the resources and codec for API version v1.
-func (m *Master) api_v1() *apiserver.APIGroupVersion {
-	storage := make(map[string]rest.Storage)
-	for k, v := range m.storage {
-		if k == "minions" || k == "minions/status" {
-			continue
+	var coreAPIVersions []string
+	if m.v1beta3 {
+		if err := makeVersion("v1beta3", v1beta3.Codec).InstallREST(m.handlerContainer, proxyDialer); err != nil {
+			return fmt.Errorf("Unable to setup API v1beta3: %v", err)
 		}
-		storage[strings.ToLower(k)] = v
+		coreAPIVersions = append(apiVersions, "v1beta3")
 	}
-	version := m.defaultAPIGroupVersion()
-	version.Storage = storage
-	version.Version = "v1"
-	version.Codec = v1.Codec
-	return version
-}
+	if m.v1 {
+		if err := makeVersion("v1", v1.Codec).InstallREST(m.handlerContainer, proxyDialer); err != nil {
+			return fmt.Errorf("Unable to setup API v1: %v", err)
+		}
+		coreAPIVersions = append(apiVersions, "v1")
+	}
+	apiserver.InstallSupport(m.muxHelper, m.rootWebService)
+	apiserver.AddApiWebService(m.handlerContainer.Container, c.APIPrefix, apiVersions)
+	requestInfoResolver := apiserver.APIRequestInfoResolver{
+		util.NewStringSet(strings.TrimPrefix(defaultVersion.Root, "/")),
+		defaultVersion.Mapper,
+	}
+	apiserver.InstallServiceErrorHandler(m.handlerContainer.Container, requestInfoResolver, coreAPIVersions)
 
-// experimental_v0 returns the resources and codec for the experimental API.
-func (m *Master) experimental_v0() *apiserver.APIGroupVersion {
-	version := m.experimentalAPIGroupVersion()
-	version.Storage = m.experimentalStorage
-	version.Version = experimental.Version
-	version.Codec = experimental.Codec
-	return version
+	if m.experimental || true { // TODO: remove the true
+		storage := map[string]rest.Storage{
+			"hello": helloetcd.NewStorage(c.EtcdHelper),
+		}
+		version := &apiserver.APIGroupVersion{
+			Root:   "/experimental",
+			Mapper: experimental.RESTMapper,
+
+			Creater:   experimental.Scheme,
+			Convertor: experimental.Scheme,
+			Typer:     experimental.Scheme,
+			Linker:    experimental.SelfLinker,
+
+			Admit:   m.admissionControl,
+			Context: m.requestContextMapper,
+
+			Storage: storage,
+			Version: experimental.Version,
+			Codec:   experimental.Codec,
+		}
+		if err := version.InstallREST(m.handlerContainer, proxyDialer); err != nil {
+			return fmt.Errorf("Unable to setup experimental API: %v", err)
+		}
+		versions := []string{experimental.Version}
+		apiserver.AddApiWebService(m.handlerContainer.Container, "/experimental", expVersions)
+		requestInfoResolver := &apiserver.APIRequestInfoResolver{
+			util.NewStringSet(strings.TrimPrefix(version.Root, "/")),
+			version.Mapper,
+		}
+		apiserver.InstallServiceErrorHandler(m.handlerContainer.Container, requestInfoResolver, versions)
+	}
+	return nil
 }
 
 func findExternalAddress(node *api.Node) (string, error) {
