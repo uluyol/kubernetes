@@ -112,7 +112,7 @@ func TestMetaValues(t *testing.T) {
 		Kind       string `json:"kind,omitempty"`
 		TestString string `json:"testString"`
 	}
-	s := NewScheme()
+	s := NewScheme("")
 	s.AddKnownTypeWithName("myapi", "", "Simple", &InternalSimple{})
 	s.AddKnownTypeWithName("myapi", "externalVersion", "Simple", &ExternalSimple{})
 
@@ -214,7 +214,7 @@ func TestMetaValuesUnregisteredConvert(t *testing.T) {
 		Kind       string `json:"kind,omitempty"`
 		TestString string `json:"testString"`
 	}
-	s := NewScheme()
+	s := NewScheme("")
 	s.InternalVersion = ""
 	// We deliberately don't register the types.
 

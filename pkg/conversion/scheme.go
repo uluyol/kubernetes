@@ -59,6 +59,9 @@ type Scheme struct {
 	// deep copy behavior.
 	cloner *Cloner
 
+	// defaulGroup is the assumed api group when no such field is present.
+	defaultGroup string
+
 	// Indent will cause the JSON output from Encode to be indented, iff it is true.
 	Indent bool
 
@@ -73,7 +76,7 @@ type Scheme struct {
 }
 
 // NewScheme manufactures a new scheme.
-func NewScheme() *Scheme {
+func NewScheme(defaultGroup string) *Scheme {
 	s := &Scheme{
 		groupVersionMap: map[groupVersion]map[string]reflect.Type{},
 		typeToGroup:     map[reflect.Type]string{},
@@ -81,6 +84,7 @@ func NewScheme() *Scheme {
 		typeToKind:      map[reflect.Type][]string{},
 		converter:       NewConverter(),
 		cloner:          NewCloner(),
+		defaultGroup:    defaultGroup,
 		InternalVersion: "",
 		MetaFactory:     DefaultMetaFactory,
 	}
@@ -398,7 +402,14 @@ func (s *Scheme) generateConvertMeta(srcVersion, destVersion string, in interfac
 // DataVersionAndKind will return the APIVersion and Kind of the given wire-format
 // encoding of an API Object, or an error.
 func (s *Scheme) DataTypeMeta(data []byte) (TypeMeta, error) {
-	return s.MetaFactory.Interpret(data)
+	tm, err := s.MetaFactory.Interpret(data)
+	if err != nil {
+		return tm, err
+	}
+	if tm.APIGroup == "" {
+		tm.APIGroup = s.defaultGroup
+	}
+	return tm, err
 }
 
 // ObjectVersionAndKind returns the API version and kind of the go object,

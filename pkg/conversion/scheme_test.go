@@ -110,7 +110,7 @@ var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
 
 // Returns a new Scheme set up with the test objects.
 func GetTestScheme() *Scheme {
-	s := NewScheme()
+	s := NewScheme("")
 	// Ordinarily, we wouldn't add TestType2, but because this is a test and
 	// both types are from the same package, we need to get it into the system
 	// so that converter will match it with ExternalType2.
@@ -232,7 +232,7 @@ func TestMultipleNames(t *testing.T) {
 }
 
 func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
-	s := NewScheme()
+	s := NewScheme("")
 	// create two names internally, with TestType1 being preferred
 	s.AddKnownTypeWithName("tapi", "", "TestType1", &TestType1{})
 	s.AddKnownTypeWithName("tapi", "", "OtherType1", &TestType1{})

@@ -223,7 +223,7 @@ func (self *Scheme) rawExtensionToRuntimeObjectArray(in *[]RawExtension, out *[]
 
 // NewScheme creates a new Scheme. This scheme is pluggable by default.
 func NewScheme() *Scheme {
-	s := &Scheme{conversion.NewScheme(), map[string]map[string]FieldLabelConversionFunc{}}
+	s := &Scheme{conversion.NewScheme(defaultGroup), map[string]map[string]FieldLabelConversionFunc{}}
 	s.raw.InternalVersion = ""
 	s.raw.MetaFactory = conversion.SimpleMetaFactory{
 		BaseFields:   []string{"TypeMeta"},
