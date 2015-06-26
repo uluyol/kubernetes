@@ -23,25 +23,25 @@ import (
 
 func TestSimpleMetaFactoryInterpret(t *testing.T) {
 	factory := SimpleMetaFactory{}
-	tm, err := factory.Interpret([]byte(`{"apiGroup":"0","apiVersion":"1","kind":"object"}`))
+	group, version, kind, err := factory.Interpret([]byte(`{"apiGroup":"0","apiVersion":"1","kind":"object"}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if tm.APIGroup != "0" || tm.APIVersion != "1" || tm.Kind != "object" {
-		t.Errorf("unexpected interpret: %v", tm)
+	if group != "0" || version != "1" || kind != "object" {
+		t.Errorf("unexpected interpret: %s %s %s", group, version, kind)
 	}
 
 	// no kind or version
-	tm, err = factory.Interpret([]byte(`{}`))
+	group, version, kind, err = factory.Interpret([]byte(`{}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if (tm != TypeMeta{}) {
-		t.Errorf("unexpected interpret: %s %s", tm)
+	if group != "" || version != "" || kind != "" {
+		t.Errorf("unexpected interpret: %s %s %s", group, version, kind)
 	}
 
 	// unparsable
-	tm, err = factory.Interpret([]byte(`{`))
+	_, _, _, err = factory.Interpret([]byte(`{`))
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -57,7 +57,7 @@ func TestSimpleMetaFactoryUpdate(t *testing.T) {
 	}{"0", "1", "2"}
 
 	// must pass a pointer
-	if err := factory.Update(TypeMeta{"first", "test", "other"}, obj); err == nil {
+	if err := factory.Update("first", "test", "other", obj); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 	if obj.G != "0" || obj.V != "1" || obj.K != "2" {
@@ -65,7 +65,7 @@ func TestSimpleMetaFactoryUpdate(t *testing.T) {
 	}
 
 	// updates
-	if err := factory.Update(TypeMeta{"first", "test", "other"}, &obj); err != nil {
+	if err := factory.Update("first", "test", "other", &obj); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if obj.G != "first" || obj.V != "test" || obj.K != "other" {
@@ -91,7 +91,7 @@ func TestSimpleMetaFactoryUpdateStruct(t *testing.T) {
 	}{Test: Inner{"0", "1", "2"}}
 
 	// updates
-	if err := factory.Update(TypeMeta{"first", "test", "other"}, &obj); err != nil {
+	if err := factory.Update("first", "test", "other", &obj); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if obj.Test.G != "first" || obj.Test.V != "test" || obj.Test.K != "other" {

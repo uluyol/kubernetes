@@ -127,7 +127,7 @@ func GetTestScheme() *Scheme {
 
 type testMetaFactory struct{}
 
-func (testMetaFactory) Interpret(data []byte) (TypeMeta, error) {
+func (testMetaFactory) Interpret(data []byte) (string, string, string, error) {
 	findKind := struct {
 		APIGroup   string `json:"myGroupKey,omitempty"`
 		APIVersion string `json:"myVersionKey,omitempty"`
@@ -137,13 +137,13 @@ func (testMetaFactory) Interpret(data []byte) (TypeMeta, error) {
 	// we understand both.
 	err := yaml.Unmarshal(data, &findKind)
 	if err != nil {
-		return TypeMeta{}, fmt.Errorf("couldn't get group/version/kind: %v", err)
+		return "", "", "", fmt.Errorf("couldn't get group/version/kind: %v", err)
 	}
-	return TypeMeta{findKind.APIGroup, findKind.APIVersion, findKind.ObjectKind}, nil
+	return findKind.APIGroup, findKind.APIVersion, findKind.ObjectKind, nil
 }
 
-func (testMetaFactory) Update(tm TypeMeta, obj interface{}) error {
-	return UpdateTypeMeta(nil, "APIGroup", tm.APIGroup, "APIVersion", tm.APIVersion, "ObjectKind", tm.Kind, obj)
+func (testMetaFactory) Update(group, version, kind string, obj interface{}) error {
+	return UpdateTypeMeta(nil, "APIGroup", group, "APIVersion", version, "ObjectKind", kind, obj)
 }
 
 func objDiff(a, b interface{}) string {

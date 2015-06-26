@@ -21,12 +21,6 @@ import (
 	"reflect"
 )
 
-type TypeMeta struct {
-	APIGroup   string `json:"apiGroup,omitempty" description:"group of the schema the object should have"`
-	APIVersion string `json:"apiVersion,omitempty" description:"version of the schema the object should have"`
-	Kind       string `json:"kind,omitempty" description:"kind of object, in CamelCase; cannot be updated"`
-}
-
 type groupVersion struct {
 	Group   string
 	Version string
@@ -182,14 +176,14 @@ func (s *Scheme) KnownTypes(group, version string) map[string]reflect.Type {
 
 // NewObject returns a new object of the given version and name,
 // or an error if it hasn't been registered.
-func (s *Scheme) NewObject(meta TypeMeta) (interface{}, error) {
-	if types, ok := s.groupVersionMap[groupVersion{meta.APIGroup, meta.APIVersion}]; ok {
-		if t, ok := types[meta.Kind]; ok {
+func (s *Scheme) NewObject(group, version, kind string) (interface{}, error) {
+	if types, ok := s.groupVersionMap[groupVersion{group, version}]; ok {
+		if t, ok := types[kind]; ok {
 			return reflect.New(t).Interface(), nil
 		}
-		return nil, &notRegisteredErr{meta: meta}
+		return nil, &notRegisteredErr{group: group, version: version, kind: kind}
 	}
-	return nil, &notRegisteredErr{meta: meta}
+	return nil, &notRegisteredErr{group: group, version: version, kind: kind}
 }
 
 // AddConversionFuncs adds functions to the list of conversion functions. The given
@@ -298,12 +292,12 @@ func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
 
 // Recognizes returns true if the scheme is able to handle the provided version and kind
 // of an object.
-func (s *Scheme) Recognizes(meta TypeMeta) bool {
-	m, ok := s.groupVersionMap[groupVersion{meta.APIGroup, meta.APIVersion}]
+func (s *Scheme) Recognizes(group, version, kind string) bool {
+	m, ok := s.groupVersionMap[groupVersion{group, version}]
 	if !ok {
 		return false
 	}
-	_, ok = m[meta.Kind]
+	_, ok = m[kind]
 	return ok
 }
 
@@ -329,11 +323,11 @@ func (s *Scheme) DeepCopy(in interface{}) (interface{}, error) {
 func (s *Scheme) Convert(in, out interface{}) error {
 	inVersion := "unknown"
 	outVersion := "unknown"
-	if tm, err := s.ObjectTypeMeta(in); err == nil {
-		inVersion = tm.APIVersion
+	if _, version, _, err := s.ObjectTypeMeta(in); err == nil {
+		inVersion = version
 	}
-	if tm, err := s.ObjectTypeMeta(out); err == nil {
-		outVersion = tm.APIVersion
+	if _, version, _, err := s.ObjectTypeMeta(out); err == nil {
+		outVersion = version
 	}
 	flags, meta := s.generateConvertMeta(inVersion, outVersion, in)
 	if flags == 0 {
@@ -361,23 +355,22 @@ func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{
 	}
 	outKind := kinds[0]
 
-	inMeta, err := s.ObjectTypeMeta(in)
+	inGroup, inVersion, _, err := s.ObjectTypeMeta(in)
 	if err != nil {
 		return nil, err
 	}
 
-	outMeta := TypeMeta{inMeta.APIGroup, outVersion, outKind}
-	out, err := s.NewObject(outMeta)
+	out, err := s.NewObject(inGroup, outVersion, outKind)
 	if err != nil {
 		return nil, err
 	}
 
-	flags, meta := s.generateConvertMeta(inMeta.APIVersion, outVersion, in)
+	flags, meta := s.generateConvertMeta(inVersion, outVersion, in)
 	if err := s.converter.Convert(in, out, flags, meta); err != nil {
 		return nil, err
 	}
 
-	if err := s.SetTypeMeta(outMeta, out); err != nil {
+	if err := s.SetTypeMeta(inGroup, outVersion, outKind, out); err != nil {
 		return nil, err
 	}
 
@@ -401,39 +394,39 @@ func (s *Scheme) generateConvertMeta(srcVersion, destVersion string, in interfac
 
 // DataVersionAndKind will return the APIVersion and Kind of the given wire-format
 // encoding of an API Object, or an error.
-func (s *Scheme) DataTypeMeta(data []byte) (TypeMeta, error) {
-	tm, err := s.MetaFactory.Interpret(data)
+func (s *Scheme) DataTypeMeta(data []byte) (group, version, kind string, err error) {
+	group, version, kind, err = s.MetaFactory.Interpret(data)
 	if err != nil {
-		return tm, err
+		return
 	}
-	if tm.APIGroup == "" {
-		tm.APIGroup = s.defaultGroup
+	if group == "" {
+		group = s.defaultGroup
 	}
-	return tm, err
+	return
 }
 
 // ObjectVersionAndKind returns the API version and kind of the go object,
 // or an error if it's not a pointer or is unregistered.
-func (s *Scheme) ObjectTypeMeta(obj interface{}) (TypeMeta, error) {
+func (s *Scheme) ObjectTypeMeta(obj interface{}) (group, version, kind string, err error) {
 	v, err := EnforcePtr(obj)
 	if err != nil {
-		return TypeMeta{}, err
+		return "", "", "", err
 	}
 	t := v.Type()
 	group, gOK := s.typeToGroup[t]
 	version, vOK := s.typeToVersion[t]
 	kinds, kOK := s.typeToKind[t]
 	if !gOK || !vOK || !kOK {
-		return TypeMeta{}, &notRegisteredErr{t: t}
+		return "", "", "", &notRegisteredErr{t: t}
 	}
-	return TypeMeta{group, version, kinds[0]}, nil
+	return group, version, kinds[0], nil
 }
 
 // SetVersionAndKind sets the version and kind fields (with help from
 // MetaInsertionFactory). Returns an error if this isn't possible. obj
 // must be a pointer.
-func (s *Scheme) SetTypeMeta(meta TypeMeta, obj interface{}) error {
-	return s.MetaFactory.Update(meta, obj)
+func (s *Scheme) SetTypeMeta(group, version, kind string, obj interface{}) error {
+	return s.MetaFactory.Update(group, version, kind, obj)
 }
 
 // maybeCopy copies obj if it is not a pointer, to get a settable/addressable

@@ -57,7 +57,7 @@ type conversionGenerator struct {
 
 func (g *conversionGenerator) GenerateConversionsForType(version string, reflection reflect.Type) error {
 	kind := reflection.Name()
-	internalObj, err := g.scheme.NewObject(conversion.TypeMeta{defaultGroup, g.scheme.InternalVersion, kind})
+	internalObj, err := g.scheme.NewObject(defaultGroup, g.scheme.InternalVersion, kind)
 	if err != nil {
 		return fmt.Errorf("cannot create an object of type %v in internal version", kind)
 	}

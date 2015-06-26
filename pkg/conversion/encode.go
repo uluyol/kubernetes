@@ -56,18 +56,18 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 		return nil, fmt.Errorf("type %v is not registered for %q and it will be impossible to Decode it, therefore Encode will refuse to encode it.", v.Type(), destVersion)
 	}
 
-	objTM, err := s.ObjectTypeMeta(obj)
+	group, version, kind, err := s.ObjectTypeMeta(obj)
 	if err != nil {
 		return nil, err
 	}
 
 	// Perform a conversion if necessary.
-	if objTM.APIVersion != destVersion {
-		objOut, err := s.NewObject(TypeMeta{objTM.APIGroup, destVersion, objTM.Kind})
+	if version != destVersion {
+		objOut, err := s.NewObject(group, destVersion, kind)
 		if err != nil {
 			return nil, err
 		}
-		flags, meta := s.generateConvertMeta(objTM.APIVersion, destVersion, obj)
+		flags, meta := s.generateConvertMeta(version, destVersion, obj)
 		err = s.converter.Convert(obj, objOut, flags, meta)
 		if err != nil {
 			return nil, err
@@ -76,13 +76,13 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 	}
 
 	// ensure the output object name comes from the destination type
-	objTM, err = s.ObjectTypeMeta(obj)
+	group, version, kind, err = s.ObjectTypeMeta(obj)
 	if err != nil {
 		return nil, err
 	}
 
 	// Version and Kind should be set on the wire.
-	err = s.SetTypeMeta(TypeMeta{objTM.APIGroup, destVersion, objTM.Kind}, obj)
+	err = s.SetTypeMeta(group, destVersion, kind, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 
 	// Version and Kind should be blank in memory. Reset them, since it's
 	// possible that we modified a user object and not a copy above.
-	err = s.SetTypeMeta(TypeMeta{}, obj)
+	err = s.SetTypeMeta("", "", "", obj)
 	if err != nil {
 		return nil, err
 	}

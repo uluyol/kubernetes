@@ -26,10 +26,10 @@ import (
 // information for all objects in a scheme.
 type MetaFactory interface {
 	// Update sets the given version and kind onto the object.
-	Update(meta TypeMeta, obj interface{}) error
+	Update(group, version, kind string, obj interface{}) error
 	// Interpret should return the version and kind of the wire-format of
 	// the object.
-	Interpret(data []byte) (TypeMeta, error)
+	Interpret(data []byte) (group, version, kind string, err error)
 }
 
 // DefaultMetaFactory is a default factory for versioning objects in JSON. The object
@@ -52,20 +52,24 @@ type SimpleMetaFactory struct {
 
 // Interpret will return the APIVersion and Kind of the JSON wire-format
 // encoding of an object, or an error.
-func (SimpleMetaFactory) Interpret(data []byte) (TypeMeta, error) {
-	findMeta := TypeMeta{}
-	err := json.Unmarshal(data, &findMeta)
+func (SimpleMetaFactory) Interpret(data []byte) (group, version, kind string, err error) {
+	findMeta := struct {
+		APIGroup   string `json:"apiGroup,omitempty"`
+		APIVersion string `json:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty"`
+	}{}
+	err = json.Unmarshal(data, &findMeta)
 	if err != nil {
-		return TypeMeta{}, fmt.Errorf("couldn't get version/kind; json parse error: %v", err)
+		return "", "", "", fmt.Errorf("couldn't get version/kind; json parse error: %v", err)
 	}
-	return findMeta, nil
+	return findMeta.APIGroup, findMeta.APIVersion, findMeta.Kind, nil
 }
 
-func (f SimpleMetaFactory) Update(tm TypeMeta, obj interface{}) error {
+func (f SimpleMetaFactory) Update(group, version, kind string, obj interface{}) error {
 	return UpdateTypeMeta(f.BaseFields,
-		f.GroupField, tm.APIGroup,
-		f.VersionField, tm.APIVersion,
-		f.KindField, tm.Kind,
+		f.GroupField, group,
+		f.VersionField, version,
+		f.KindField, kind,
 		obj)
 }
 

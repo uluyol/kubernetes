@@ -22,15 +22,23 @@ import (
 )
 
 type notRegisteredErr struct {
-	meta TypeMeta
-	t    reflect.Type
+	group   string
+	version string
+	kind    string
+	t       reflect.Type
 }
 
 func (k *notRegisteredErr) Error() string {
 	if k.t != nil {
 		return fmt.Sprintf("no kind is registered for the type %v", k.t)
 	}
-	return fmt.Sprintf("no type registered for %v", k.meta)
+	if k.kind == "" {
+		return fmt.Sprintf("no group %q and version %q have been registered", k.group, k.version)
+	}
+	if k.version == "" {
+		return fmt.Sprintf("no kind %q is registered for the default version", k.kind)
+	}
+	return fmt.Sprintf("no kind %q is registered for version %q and group %q", k.kind, k.version, k.group)
 }
 
 // IsNotRegisteredError returns true if the error indicates the provided
