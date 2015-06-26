@@ -60,6 +60,11 @@ type TypeMeta struct {
 	// Servers should convert recognized schemas to the latest internal value, and
 	// may reject unrecognized values.
 	APIVersion string `json:"apiVersion,omitempty"`
+
+	// APIGroup defines the versioned schema of this representation of an object.
+	// Servers should convert recognized schemas to the latest internal value, and
+	// may reject unrecognized values.
+	APIGroup string `json:"apiGroup,omitempty"`
 }
 
 // ListMeta describes metadata that synthetic resources must have, including lists and

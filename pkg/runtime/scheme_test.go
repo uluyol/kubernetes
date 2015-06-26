@@ -27,6 +27,7 @@ import (
 type TypeMeta struct {
 	Kind       string `json:"kind,omitempty"`
 	APIVersion string `json:"apiVersion,omitempty"`
+	APIGroup   string `json:"apiGroup,omitempty"`
 }
 
 type InternalSimple struct {
@@ -204,7 +205,7 @@ func TestExternalToInternalMapping(t *testing.T) {
 	}{
 		{
 			&InternalOptionalExtensionType{Extension: runtime.EmbeddedObject{nil}},
-			`{"kind":"OptionalExtensionType","apiVersion":"testExternal"}`,
+			`{"kind":"OptionalExtensionType","apiVersion":"testExternal","apiGroup":"api"}`,
 		},
 	}
 
@@ -242,13 +243,13 @@ func TestExtensionMapping(t *testing.T) {
 	}{
 		{
 			&InternalExtensionType{Extension: runtime.EmbeddedObject{&ExtensionA{TestString: "foo"}}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"A","testString":"foo"}}`,
+			`{"kind":"ExtensionType","apiVersion":"testExternal","apiGroup":"api","extension":{"kind":"A","testString":"foo"}}`,
 		}, {
 			&InternalExtensionType{Extension: runtime.EmbeddedObject{&ExtensionB{TestString: "bar"}}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":{"kind":"B","testString":"bar"}}`,
+			`{"kind":"ExtensionType","apiVersion":"testExternal","apiGroup":"api","extension":{"kind":"B","testString":"bar"}}`,
 		}, {
 			&InternalExtensionType{Extension: runtime.EmbeddedObject{nil}},
-			`{"kind":"ExtensionType","apiVersion":"testExternal","extension":null}`,
+			`{"kind":"ExtensionType","apiVersion":"testExternal","apiGroup":"api","extension":null}`,
 		},
 	}
 

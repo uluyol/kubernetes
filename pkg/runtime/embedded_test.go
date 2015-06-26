@@ -64,7 +64,7 @@ func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 	s.AddKnownTypes("", &ObjectTest{})
 	s.AddKnownTypeWithName("v1test", "ObjectTest", &ObjectTestExternal{})
 
-	obj, err := s.Decode([]byte(`{"kind":"ObjectTest","apiVersion":"v1test","items":[{}]}`))
+	obj, err := s.Decode([]byte(`{"kind":"ObjectTest","apiVersion":"v1test","apiGroup":"api","items":[{}]}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 		t.Fatalf("unexpected object: %#v", test.Items[0])
 	}
 
-	obj, err = s.Decode([]byte(`{"kind":"ObjectTest","apiVersion":"v1test","items":[{"kind":"Other","apiVersion":"v1"}]}`))
+	obj, err = s.Decode([]byte(`{"kind":"ObjectTest","apiVersion":"v1test","apiGroup":"api","items":[{"kind":"Other","apiVersion":"v1"}]}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

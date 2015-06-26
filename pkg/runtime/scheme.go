@@ -25,6 +25,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
+const (
+	defaultGroup = "api"
+)
+
 // Scheme defines methods for serializing and deserializing API objects. It
 // is an adaptation of conversion's Scheme for our API objects.
 type Scheme struct {
@@ -66,13 +70,13 @@ func (self *Scheme) embeddedObjectToRawExtension(in *EmbeddedObject, out *RawExt
 
 	// Figure out the type and kind of the output object.
 	_, outVersion, scheme := self.fromScope(s)
-	_, kind, err := scheme.raw.ObjectVersionAndKind(in.Object)
+	tm, err := scheme.raw.ObjectTypeMeta(in.Object)
 	if err != nil {
 		return err
 	}
 
 	// Manufacture an object of this type and kind.
-	outObj, err := scheme.New(outVersion, kind)
+	outObj, err := scheme.New(outVersion, tm.Kind)
 	if err != nil {
 		return err
 	}
@@ -85,7 +89,7 @@ func (self *Scheme) embeddedObjectToRawExtension(in *EmbeddedObject, out *RawExt
 
 	// Copy the kind field into the ouput object.
 	err = s.Convert(
-		&emptyPlugin{PluginBase: PluginBase{Kind: kind}},
+		&emptyPlugin{PluginBase: PluginBase{Kind: tm.Kind}},
 		outObj,
 		conversion.SourceToDest|conversion.IgnoreMissingFields|conversion.AllowDifferentFieldTypeNames,
 	)
@@ -113,14 +117,14 @@ func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *Embedded
 	}
 	// Figure out the type and kind of the output object.
 	inVersion, outVersion, scheme := self.fromScope(s)
-	_, kind, err := scheme.raw.DataVersionAndKind(in.RawJSON)
+	tm, err := scheme.raw.DataTypeMeta(in.RawJSON)
 	if err != nil {
 		return err
 	}
 
 	// We have to make this object ourselves because we don't store the version field for
 	// plugin objects.
-	inObj, err := scheme.New(inVersion, kind)
+	inObj, err := scheme.New(inVersion, tm.Kind)
 	if err != nil {
 		return err
 	}
@@ -131,7 +135,7 @@ func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *Embedded
 	}
 
 	// Make the desired internal version, and do the conversion.
-	outObj, err := scheme.New(outVersion, kind)
+	outObj, err := scheme.New(outVersion, tm.Kind)
 	if err != nil {
 		return err
 	}
@@ -201,14 +205,14 @@ func (self *Scheme) rawExtensionToRuntimeObjectArray(in *[]RawExtension, out *[]
 
 	for i := range src {
 		data := src[i].RawJSON
-		version, kind, err := scheme.raw.DataVersionAndKind(data)
+		tm, err := scheme.raw.DataTypeMeta(data)
 		if err != nil {
 			return err
 		}
 		dest[i] = &Unknown{
 			TypeMeta: TypeMeta{
-				APIVersion: version,
-				Kind:       kind,
+				APIVersion: tm.APIVersion,
+				Kind:       tm.Kind,
 			},
 			RawJSON: data,
 		}
@@ -221,7 +225,12 @@ func (self *Scheme) rawExtensionToRuntimeObjectArray(in *[]RawExtension, out *[]
 func NewScheme() *Scheme {
 	s := &Scheme{conversion.NewScheme(), map[string]map[string]FieldLabelConversionFunc{}}
 	s.raw.InternalVersion = ""
-	s.raw.MetaFactory = conversion.SimpleMetaFactory{BaseFields: []string{"TypeMeta"}, VersionField: "APIVersion", KindField: "Kind"}
+	s.raw.MetaFactory = conversion.SimpleMetaFactory{
+		BaseFields:   []string{"TypeMeta"},
+		GroupField:   "APIGroup",
+		VersionField: "APIVersion",
+		KindField:    "Kind",
+	}
 	if err := s.raw.AddConversionFuncs(
 		s.embeddedObjectToRawExtension,
 		s.rawExtensionToEmbeddedObject,
@@ -250,43 +259,45 @@ func (s *Scheme) AddKnownTypes(version string, types ...Object) {
 	for i := range types {
 		interfaces[i] = types[i]
 	}
-	s.raw.AddKnownTypes(version, interfaces...)
+	s.raw.AddKnownTypes(defaultGroup, version, interfaces...)
 }
 
 // AddKnownTypeWithName is like AddKnownTypes, but it lets you specify what this type should
 // be encoded as. Useful for testing when you don't want to make multiple packages to define
 // your structs.
 func (s *Scheme) AddKnownTypeWithName(version, kind string, obj Object) {
-	s.raw.AddKnownTypeWithName(version, kind, obj)
+	s.raw.AddKnownTypeWithName(defaultGroup, version, kind, obj)
 }
 
 // KnownTypes returns the types known for the given version.
 // Return value must be treated as read-only.
 func (s *Scheme) KnownTypes(version string) map[string]reflect.Type {
-	return s.raw.KnownTypes(version)
+	return s.raw.KnownTypes(defaultGroup, version)
 }
 
 // DataVersionAndKind will return the APIVersion and Kind of the given wire-format
 // encoding of an API Object, or an error.
 func (s *Scheme) DataVersionAndKind(data []byte) (version, kind string, err error) {
-	return s.raw.DataVersionAndKind(data)
+	tm, err := s.raw.DataTypeMeta(data)
+	return tm.APIVersion, tm.Kind, err
 }
 
 // ObjectVersionAndKind returns the version and kind of the given Object.
 func (s *Scheme) ObjectVersionAndKind(obj Object) (version, kind string, err error) {
-	return s.raw.ObjectVersionAndKind(obj)
+	tm, err := s.raw.ObjectTypeMeta(obj)
+	return tm.APIVersion, tm.Kind, err
 }
 
 // Recognizes returns true if the scheme is able to handle the provided version and kind
 // of an object.
 func (s *Scheme) Recognizes(version, kind string) bool {
-	return s.raw.Recognizes(version, kind)
+	return s.raw.Recognizes(conversion.TypeMeta{defaultGroup, version, kind})
 }
 
 // New returns a new API object of the given version ("" for internal
 // representation) and name, or an error if it hasn't been registered.
 func (s *Scheme) New(versionName, typeName string) (Object, error) {
-	obj, err := s.raw.NewObject(versionName, typeName)
+	obj, err := s.raw.NewObject(conversion.TypeMeta{defaultGroup, versionName, typeName})
 	if err != nil {
 		return nil, err
 	}

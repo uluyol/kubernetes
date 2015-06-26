@@ -2217,6 +2217,7 @@ func convert_api_TypeMeta_To_v1_TypeMeta(in *api.TypeMeta, out *TypeMeta, s conv
 	}
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
+	out.APIGroup = in.APIGroup
 	return nil
 }
 
@@ -4528,6 +4529,7 @@ func convert_v1_TypeMeta_To_api_TypeMeta(in *TypeMeta, out *api.TypeMeta, s conv
 	}
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
+	out.APIGroup = in.APIGroup
 	return nil
 }
 

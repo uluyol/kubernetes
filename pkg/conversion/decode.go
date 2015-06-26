@@ -28,17 +28,20 @@ import (
 // s.InternalVersion type before being returned. Decode will not decode
 // objects without version set unless InternalVersion is also "".
 func (s *Scheme) Decode(data []byte) (interface{}, error) {
-	version, kind, err := s.DataVersionAndKind(data)
+	tm, err := s.DataTypeMeta(data)
 	if err != nil {
 		return nil, err
 	}
-	if version == "" && s.InternalVersion != "" {
+	if tm.APIVersion == "" && s.InternalVersion != "" {
 		return nil, fmt.Errorf("version not set in '%s'", string(data))
 	}
-	if kind == "" {
+	if tm.Kind == "" {
 		return nil, fmt.Errorf("kind not set in '%s'", string(data))
 	}
-	obj, err := s.NewObject(version, kind)
+	if tm.APIGroup == "" {
+		return nil, fmt.Errorf("group not set in '%s'", string(data))
+	}
+	obj, err := s.NewObject(tm)
 	if err != nil {
 		return nil, err
 	}
@@ -48,17 +51,17 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 	}
 
 	// Version and Kind should be blank in memory.
-	if err := s.SetVersionAndKind("", "", obj); err != nil {
+	if err := s.SetTypeMeta(TypeMeta{}, obj); err != nil {
 		return nil, err
 	}
 
 	// Convert if needed.
-	if s.InternalVersion != version {
-		objOut, err := s.NewObject(s.InternalVersion, kind)
+	if s.InternalVersion != tm.APIVersion {
+		objOut, err := s.NewObject(TypeMeta{tm.APIGroup, s.InternalVersion, tm.Kind})
 		if err != nil {
 			return nil, err
 		}
-		flags, meta := s.generateConvertMeta(version, s.InternalVersion, obj)
+		flags, meta := s.generateConvertMeta(tm.APIVersion, s.InternalVersion, obj)
 		if err := s.converter.Convert(obj, objOut, flags, meta); err != nil {
 			return nil, err
 		}
@@ -76,37 +79,42 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 	if len(data) == 0 {
 		return errors.New("empty input")
 	}
-	dataVersion, dataKind, err := s.DataVersionAndKind(data)
+	dataTM, err := s.DataTypeMeta(data)
 	if err != nil {
 		return err
 	}
-	objVersion, objKind, err := s.ObjectVersionAndKind(obj)
+	objTM, err := s.ObjectTypeMeta(obj)
 	if err != nil {
 		return err
 	}
-	if dataKind == "" {
+	if dataTM.Kind == "" {
 		// Assume objects with unset Kind fields are being unmarshalled into the
 		// correct type.
-		dataKind = objKind
+		dataTM.Kind = objTM.Kind
 	}
-	if dataVersion == "" {
+	if dataTM.APIVersion == "" {
 		// Assume objects with unset Version fields are being unmarshalled into the
 		// correct type.
-		dataVersion = objVersion
+		dataTM.APIVersion = objTM.APIVersion
+	}
+	if dataTM.APIGroup == "" {
+		// Assume objects with unset Group fields are being unmarshalled into the
+		// correct type.
+		dataTM.APIGroup = objTM.APIGroup
 	}
 
-	external, err := s.NewObject(dataVersion, dataKind)
+	external, err := s.NewObject(dataTM)
 	if err != nil {
 		return err
 	}
 	if err := json.Unmarshal(data, external); err != nil {
 		return err
 	}
-	flags, meta := s.generateConvertMeta(dataVersion, objVersion, external)
+	flags, meta := s.generateConvertMeta(dataTM.APIVersion, objTM.APIVersion, external)
 	if err := s.converter.Convert(external, obj, flags, meta); err != nil {
 		return err
 	}
 
 	// Version and Kind should be blank in memory.
-	return s.SetVersionAndKind("", "", obj)
+	return s.SetTypeMeta(TypeMeta{}, obj)
 }

@@ -1939,6 +1939,7 @@ func deepCopy_v1beta3_TCPSocketAction(in TCPSocketAction, out *TCPSocketAction, 
 func deepCopy_v1beta3_TypeMeta(in TypeMeta, out *TypeMeta, c *conversion.Cloner) error {
 	out.Kind = in.Kind
 	out.APIVersion = in.APIVersion
+	out.APIGroup = in.APIGroup
 	return nil
 }
 
