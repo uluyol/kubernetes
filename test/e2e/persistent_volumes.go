@@ -22,6 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"time"
@@ -160,7 +161,7 @@ func makeCheckPod(ns string, nfsserver string) *api.Pod {
 	// Prepare pod that mounts the NFS volume again and
 	// checks that /mnt/index.html was scrubbed there
 	return &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: runtime.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1beta3",
 		},

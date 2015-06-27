@@ -42,9 +42,9 @@ import (
 const validEtcdVersion = "etcd 2.0.9"
 
 type TestResource struct {
-	api.TypeMeta   `json:",inline"`
-	api.ObjectMeta `json:"metadata"`
-	Value          int `json:"value"`
+	runtime.TypeMeta `json:",inline"`
+	api.ObjectMeta   `json:"metadata"`
+	Value            int `json:"value"`
 }
 
 func (*TestResource) IsAnAPIObject() {}
