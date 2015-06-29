@@ -293,6 +293,9 @@ func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
 // Recognizes returns true if the scheme is able to handle the provided version and kind
 // of an object.
 func (s *Scheme) Recognizes(group, version, kind string) bool {
+	if group == "" {
+		group = s.defaultGroup
+	}
 	m, ok := s.groupVersionMap[groupVersion{group, version}]
 	if !ok {
 		return false
