@@ -22,34 +22,41 @@ import (
 	"fmt"
 )
 
+func (s *Scheme) DecodeToVersionedObject(data []byte) (obj interface{}, group, version, kind string, err error) {
+	group, version, kind, err = s.DataTypeMeta(data)
+	if err != nil {
+		return
+	}
+	if version == "" && s.InternalVersion != "" {
+		return nil, "", "", "", fmt.Errorf("version not set in '%s'", string(data))
+	}
+	if kind == "" {
+		return nil, "", "", "", fmt.Errorf("kind not set in '%s'", string(data))
+	}
+	if group == "" {
+		return nil, "", "", "", fmt.Errorf("group not set in '%s'", string(data))
+	}
+	obj, err = s.NewObject(group, version, kind)
+	if err != nil {
+		return nil, "", "", "", err
+	}
+
+	if err := json.Unmarshal(data, obj); err != nil {
+		return nil, "", "", "", err
+	}
+	return
+}
+
 // Decode converts a JSON string back into a pointer to an api object.
 // Deduces the type based upon the fields added by the MetaInsertionFactory
 // technique. The object will be converted, if necessary, into the
 // s.InternalVersion type before being returned. Decode will not decode
 // objects without version set unless InternalVersion is also "".
 func (s *Scheme) Decode(data []byte) (interface{}, error) {
-	group, version, kind, err := s.DataTypeMeta(data)
+	obj, group, version, kind, err := s.DecodeToVersionedObject(data)
 	if err != nil {
 		return nil, err
 	}
-	if version == "" && s.InternalVersion != "" {
-		return nil, fmt.Errorf("version not set in '%s'", string(data))
-	}
-	if kind == "" {
-		return nil, fmt.Errorf("kind not set in '%s'", string(data))
-	}
-	if group == "" {
-		return nil, fmt.Errorf("group not set in '%s'", string(data))
-	}
-	obj, err := s.NewObject(group, version, kind)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := json.Unmarshal(data, obj); err != nil {
-		return nil, err
-	}
-
 	// Version and Kind should be blank in memory.
 	if err := s.SetTypeMeta("", "", "", obj); err != nil {
 		return nil, err

@@ -52,9 +52,9 @@ var _ = Describe("Networking", func() {
 	})
 
 	It("should provide Internet connection for containers", func() {
-		By("Running container which pings google.com")
-		podName := "ping-test"
-		contName := "ping-test-container"
+		By("Running container which tries to wget google.com")
+		podName := "wget-test"
+		contName := "wget-test-container"
 		pod := &api.Pod{
 			TypeMeta: runtime.TypeMeta{
 				Kind: "Pod",
@@ -67,7 +67,7 @@ var _ = Describe("Networking", func() {
 					{
 						Name:    contName,
 						Image:   "gcr.io/google_containers/busybox",
-						Command: []string{"ping", "-c", "3", "-w", "10", "google.com"},
+						Command: []string{"wget", "-s", "google.com"},
 					},
 				},
 				RestartPolicy: api.RestartPolicyNever,
@@ -104,10 +104,8 @@ var _ = Describe("Networking", func() {
 
 	//Now we can proceed with the test.
 	It("should function for intra-pod communication", func() {
-		if testContext.Provider == "vagrant" {
-			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
-			return
-		}
+		// TODO: support DNS on vagrant #3580
+		SkipIfProviderIs("vagrant")
 
 		By(fmt.Sprintf("Creating a service named %q in namespace %q", svcname, f.Namespace.Name))
 		svc, err := f.Client.Services(f.Namespace.Name).Create(&api.Service{

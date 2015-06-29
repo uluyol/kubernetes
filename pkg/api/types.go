@@ -47,6 +47,12 @@ import (
 //         [a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
 //     or more simply:
 //         DNS_LABEL(\.DNS_LABEL)*
+//
+// IANA_SVC_NAME: This is a string, no more than 15 characters long, that
+//      conforms to the definition of IANA service name in RFC 6335.
+//      It must contains at least one letter [a-z] and it must contains only [a-z0-9-].
+//      Hypens ('-') cannot be leading or trailing character of the string
+//      and cannot be adjacent to other hyphens.
 
 // TypeMeta describes an individual object in an API response or request
 // with strings representing the type of the object and its API schema version.
@@ -545,7 +551,7 @@ type RBDVolumeSource struct {
 
 // ContainerPort represents a network port in a single container
 type ContainerPort struct {
-	// Optional: If specified, this must be a DNS_LABEL.  Each named port
+	// Optional: If specified, this must be an IANA_SVC_NAME  Each named port
 	// in a pod must have a unique name.
 	Name string `json:"name,omitempty"`
 	// Optional: If specified, this must be a valid port number, 0 < x < 65536.
@@ -610,7 +616,19 @@ type HTTPGetAction struct {
 	Port util.IntOrString `json:"port,omitempty"`
 	// Optional: Host name to connect to, defaults to the pod IP.
 	Host string `json:"host,omitempty"`
+	// Optional: Scheme to use for connecting to the host, defaults to HTTP.
+	Scheme URIScheme `json:"scheme,omitempty"`
 }
+
+// URIScheme identifies the scheme used for connection to a host for Get actions
+type URIScheme string
+
+const (
+	// URISchemeHTTP means that the scheme used will be http://
+	URISchemeHTTP URIScheme = "HTTP"
+	// URISchemeHTTPS means that the scheme used will be https://
+	URISchemeHTTPS URIScheme = "HTTPS"
+)
 
 // TCPSocketAction describes an action based on opening a socket
 type TCPSocketAction struct {

@@ -45,6 +45,12 @@ import (
 //         [a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*
 //     or more simply:
 //         DNS_LABEL(\.DNS_LABEL)*
+//
+// IANA_SVC_NAME: This is a string, no more than 15 characters long, that
+//      conforms to the definition of IANA service name in RFC 6335.
+//      It must contains at least one letter [a-z] and it must contains only [a-z0-9-].
+//      Hypens ('-') cannot be leading or trailing character of the string
+//      and cannot be adjacent to other hyphens.
 
 // TypeMeta describes an individual object in an API response or request
 // with strings representing the type of the object and its API schema version.
@@ -523,9 +529,9 @@ type ISCSIVolumeSource struct {
 
 // ContainerPort represents a network port in a single container.
 type ContainerPort struct {
-	// Optional: If specified, this must be a DNS_LABEL.  Each named port
+	// Optional: If specified, this must be an IANA_SVC_NAME  Each named port
 	// in a pod must have a unique name.
-	Name string `json:"name,omitempty" description:"name for the port that can be referred to by services; must be a DNS_LABEL and unique without the pod"`
+	Name string `json:"name,omitempty" description:"name for the port that can be referred to by services; must be an IANA_SVC_NAME and unique within the pod"`
 	// Optional: If specified, this must be a valid port number, 0 < x < 65536.
 	// If HostNetwork is specified, this must match ContainerPort.
 	HostPort int `json:"hostPort,omitempty" description:"number of port to expose on the host; most containers do not need this"`
@@ -583,15 +589,27 @@ type HTTPGetAction struct {
 	// Optional: Path to access on the HTTP server.
 	Path string `json:"path,omitempty" description:"path to access on the HTTP server"`
 	// Required: Name or number of the port to access on the container.
-	Port util.IntOrString `json:"port" description:"number or name of the port to access on the container"`
+	Port util.IntOrString `json:"port" description:"number or name of the port to access on the container; number must be in the range 1 to 65535; name must be an IANA_SVC_NAME"`
 	// Optional: Host name to connect to, defaults to the pod IP.
 	Host string `json:"host,omitempty" description:"hostname to connect to; defaults to pod IP"`
+	// Optional: Scheme to use for connecting to the host, defaults to HTTP.
+	Scheme URIScheme `json:"scheme,omitempty" description:"scheme to connect with, must be HTTP or HTTPS, defaults to HTTP"`
 }
+
+// URIScheme identifies the scheme used for connection to a host for Get actions
+type URIScheme string
+
+const (
+	// URISchemeHTTP means that the scheme used will be http://
+	URISchemeHTTP URIScheme = "HTTP"
+	// URISchemeHTTPS means that the scheme used will be https://
+	URISchemeHTTPS URIScheme = "HTTPS"
+)
 
 // TCPSocketAction describes an action based on opening a socket
 type TCPSocketAction struct {
 	// Required: Port to connect to.
-	Port util.IntOrString `json:"port" description:"number of name of the port to access on the container"`
+	Port util.IntOrString `json:"port" description:"number of name of the port to access on the container; number must be in the range 1 to 65535; name must be an IANA_SVC_NAME"`
 }
 
 // ExecAction describes a "run in container" action.
@@ -953,7 +971,7 @@ type PodTemplateList struct {
 
 // ReplicationControllerSpec is the specification of a replication controller.
 type ReplicationControllerSpec struct {
-	// Replicas is the number of desired replicas.
+	// Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified.
 	Replicas *int `json:"replicas,omitempty" description:"number of replicas desired; defaults to 1"`
 
 	// Selector is a label query over pods that should match the Replicas count.
@@ -1071,7 +1089,7 @@ type ServiceSpec struct {
 	// not be changed by updates.
 	// Valid values are None, empty string (""), or a valid IP address
 	// None can be specified for headless services when proxying is not required
-	ClusterIP string `json:"clusterIP,omitempty description: IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused, and creation of the service will fail otherwise; cannot be updated; 'None' can be specified for a headless service when proxying is not required"`
+	ClusterIP string `json:"clusterIP,omitempty" description:"IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused or else creation of the service will fail; cannot be updated; 'None' can be specified for a headless service when proxying is not required"`
 
 	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer
 	Type ServiceType `json:"type,omitempty" description:"type of this service; must be ClusterIP, NodePort, or LoadBalancer; defaults to ClusterIP"`
@@ -1102,11 +1120,11 @@ type ServicePort struct {
 	// If this is a string, it will be looked up as a named port in the
 	// target Pod's container ports.  If this is not specified, the value
 	// of Port is used (an identity map).
-	TargetPort util.IntOrString `json:"targetPort,omitempty" description:"the port to access on the pods targeted by the service; defaults to the service port"`
+	TargetPort util.IntOrString `json:"targetPort,omitempty" description:"number or name of the port to access on the pods targeted by the service; defaults to the service port; number must be in the range 1 to 65535; name must be an IANA_SVC_NAME"`
 
 	// The port on each node on which this service is exposed.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
-	NodePort int `json:"nodePort" description:"the port on each node on which this service is exposed"`
+	NodePort int `json:"nodePort" description:"the port on each node on which this service is exposed when type=NodePort or LoadBalancer; usually assigned by the system; if specified, it will be allocated to the service if unused or else creation of the service will fail"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
