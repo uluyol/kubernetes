@@ -48,9 +48,9 @@ import (
 //     or more simply:
 //         DNS_LABEL(\.DNS_LABEL)*
 
-// runtime.TypeMeta describes an individual object in an API response or request
+// TypeMeta describes an individual object in an API response or request
 // with strings representing the type of the object and its API schema version.
-// Structures that are versioned or persisted should inline runtime.TypeMeta.
+// Structures that are versioned or persisted should inline TypeMeta.
 type TypeMeta struct {
 	// Kind is a string value representing the REST resource this object represents.
 	// Servers may infer this from the endpoint the client submits requests to.
@@ -60,11 +60,6 @@ type TypeMeta struct {
 	// Servers should convert recognized schemas to the latest internal value, and
 	// may reject unrecognized values.
 	APIVersion string `json:"apiVersion,omitempty"`
-
-	// APIGroup defines the versioned schema of this representation of an object.
-	// Servers should convert recognized schemas to the latest internal value, and
-	// may reject unrecognized values.
-	APIGroup string `json:"apiGroup,omitempty"`
 }
 
 // ListMeta describes metadata that synthetic resources must have, including lists and
