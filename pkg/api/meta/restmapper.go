@@ -20,6 +20,8 @@ package meta
 import (
 	"fmt"
 	"strings"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 // Implements RESTScope interface
@@ -54,13 +56,6 @@ var RESTScopeRoot = &restScope{
 	name: RESTScopeNameRoot,
 }
 
-// typeMeta is used as a key for lookup in the mapping between REST path and
-// API object.
-type typeMeta struct {
-	APIVersion string
-	Kind       string
-}
-
 // DefaultRESTMapper exposes mappings between the types defined in a
 // runtime.Scheme. It assumes that all types defined the provided scheme
 // can be mapped with the provided MetadataAccessor and Codec interfaces.
@@ -74,9 +69,9 @@ type typeMeta struct {
 // TODO: Only accept plural for some operations for increased control?
 // (`get pod bar` vs `get pods bar`)
 type DefaultRESTMapper struct {
-	mapping        map[string]typeMeta
-	reverse        map[typeMeta]string
-	scopes         map[typeMeta]RESTScope
+	mapping        map[string]runtime.TypeMeta
+	reverse        map[runtime.TypeMeta]string
+	scopes         map[runtime.TypeMeta]RESTScope
 	versions       []string
 	interfacesFunc VersionInterfacesFunc
 }
@@ -91,9 +86,9 @@ type VersionInterfacesFunc func(apiVersion string) (*VersionInterfaces, bool)
 // search when an object has no default version (set empty to return an error)
 // and a function that retrieves the correct codec and metadata for a given version.
 func NewDefaultRESTMapper(versions []string, f VersionInterfacesFunc) *DefaultRESTMapper {
-	mapping := make(map[string]typeMeta)
-	reverse := make(map[typeMeta]string)
-	scopes := make(map[typeMeta]RESTScope)
+	mapping := make(map[string]runtime.TypeMeta)
+	reverse := make(map[runtime.TypeMeta]string)
+	scopes := make(map[runtime.TypeMeta]RESTScope)
 	// TODO: verify name mappings work correctly when versions differ
 
 	return &DefaultRESTMapper{
@@ -107,7 +102,7 @@ func NewDefaultRESTMapper(versions []string, f VersionInterfacesFunc) *DefaultRE
 
 func (m *DefaultRESTMapper) Add(scope RESTScope, kind string, version string, mixedCase bool) {
 	plural, singular := kindToResource(kind, mixedCase)
-	meta := typeMeta{APIVersion: version, Kind: kind}
+	meta := runtime.TypeMeta{APIVersion: version, Kind: kind}
 	_, ok1 := m.mapping[plural]
 	_, ok2 := m.mapping[strings.ToLower(plural)]
 	if !ok1 && !ok2 {
@@ -170,7 +165,7 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 			continue
 		}
 		hadVersion = true
-		if _, ok := m.reverse[typeMeta{APIVersion: v, Kind: kind}]; ok {
+		if _, ok := m.reverse[runtime.TypeMeta{APIVersion: v, Kind: kind}]; ok {
 			version = v
 			break
 		}
@@ -178,7 +173,7 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 	// Use the default preferred versions
 	if !hadVersion && len(version) == 0 {
 		for _, v := range m.versions {
-			if _, ok := m.reverse[typeMeta{APIVersion: v, Kind: kind}]; ok {
+			if _, ok := m.reverse[runtime.TypeMeta{APIVersion: v, Kind: kind}]; ok {
 				version = v
 				break
 			}
@@ -189,11 +184,11 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 	}
 
 	// Ensure we have a REST mapping
-	resource, ok := m.reverse[typeMeta{APIVersion: version, Kind: kind}]
+	resource, ok := m.reverse[runtime.TypeMeta{APIVersion: version, Kind: kind}]
 	if !ok {
 		found := []string{}
 		for _, v := range m.versions {
-			if _, ok := m.reverse[typeMeta{APIVersion: v, Kind: kind}]; ok {
+			if _, ok := m.reverse[runtime.TypeMeta{APIVersion: v, Kind: kind}]; ok {
 				found = append(found, v)
 			}
 		}
@@ -204,7 +199,7 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 	}
 
 	// Ensure we have a REST scope
-	scope, ok := m.scopes[typeMeta{APIVersion: version, Kind: kind}]
+	scope, ok := m.scopes[runtime.TypeMeta{APIVersion: version, Kind: kind}]
 	if !ok {
 		return nil, fmt.Errorf("the provided version %q and kind %q cannot be mapped to a supported scope", version, kind)
 	}
