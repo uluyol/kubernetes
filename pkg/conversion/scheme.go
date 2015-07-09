@@ -19,6 +19,7 @@ package conversion
 import (
 	"fmt"
 	"reflect"
+	"runtime"
 )
 
 type groupVersion struct {
@@ -177,13 +178,15 @@ func (s *Scheme) KnownTypes(group, version string) map[string]reflect.Type {
 // NewObject returns a new object of the given version and name,
 // or an error if it hasn't been registered.
 func (s *Scheme) NewObject(group, version, kind string) (interface{}, error) {
+	var buf [1 << 20]byte
+	n := runtime.Stack(buf[:], false)
 	if types, ok := s.groupVersionMap[groupVersion{group, version}]; ok {
 		if t, ok := types[kind]; ok {
 			return reflect.New(t).Interface(), nil
 		}
-		return nil, &notRegisteredErr{group: group, version: version, kind: kind}
+		return nil, fmt.Errorf("%v [[%s]]", &notRegisteredErr{group: group, version: version, kind: kind}, buf[:n])
 	}
-	return nil, &notRegisteredErr{group: group, version: version, kind: kind}
+	return nil, fmt.Errorf("%v [[%s]]", &notRegisteredErr{group: group, version: version, kind: kind}, buf[:n])
 }
 
 // AddConversionFuncs adds functions to the list of conversion functions. The given

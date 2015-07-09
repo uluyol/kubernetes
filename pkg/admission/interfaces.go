@@ -40,6 +40,8 @@ type Attributes interface {
 	GetOperation() Operation
 	// GetObject is the object from the incoming request prior to default values being applied
 	GetObject() runtime.Object
+	// GetGroup is the API group of the type of object being manipulated
+	GetGroup() string
 	// GetKind is the type of object being manipulated.  For example: Pod
 	GetKind() string
 	// GetUserInfo is information about the requesting user

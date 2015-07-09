@@ -34,6 +34,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/experimental"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
@@ -52,6 +53,7 @@ import (
 	endpointsetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
+	helloetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/experimental-hello/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	nodeetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion/etcd"
@@ -95,10 +97,10 @@ type Config struct {
 	EnableUISupport       bool
 	// allow downstream consumers to disable swagger
 	EnableSwaggerSupport bool
-	// allow v1beta3 to be conditionally disabled
-	DisableV1Beta3 bool
-	// allow v1 to be conditionally disabled
-	DisableV1 bool
+	// allow api versions to be conditionally disabled
+	DisableV1Beta3      bool
+	DisableV1           bool
+	DisableExperimental bool
 	// allow downstream consumers to disable the index route
 	EnableIndex           bool
 	EnableProfiling       bool
@@ -186,6 +188,7 @@ type Master struct {
 	masterCount           int
 	v1beta3               bool
 	v1                    bool
+	experimental          bool
 	requestContextMapper  api.RequestContextMapper
 
 	// External host is the name that should be used in external (public internet) URLs for this master
@@ -563,6 +566,17 @@ func (m *Master) init(c *Config) {
 	requestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(strings.TrimPrefix(defaultVersion.Root, "/")), defaultVersion.Mapper}
 	apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, apiVersions)
 
+	if m.experimental || true {
+		expGroupVersion := m.experimental_group(c.EtcdHelper)
+		if err := expGroupVersion.InstallREST(m.handlerContainer); err != nil {
+			glog.Fatalf("Unable to setup experimental API: %v", err)
+		}
+		expVersions := []string{experimental.Version}
+		apiserver.AddApiWebService(m.handlerContainer, experimental.Group, expVersions)
+		requestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(experimental.Group), expGroupVersion.Mapper}
+		apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, expVersions)
+	}
+
 	// Register root handler.
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
 	// Allow master to be embedded in contexts which already have something registered at the root
@@ -725,9 +739,37 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 	return serversToValidate
 }
 
+func (m *Master) experimental_group(helper tools.EtcdHelper) *apiserver.APIGroupVersion {
+	storage := map[string]rest.Storage{
+		"hello": helloetcd.NewStorage(tools.NewEtcdHelper(helper.Client, experimental.Codec, DefaultEtcdPathPrefix)),
+	}
+	return &apiserver.APIGroupVersion{
+		Root:    experimental.Group,
+		Group:   experimental.Group,
+		Version: experimental.Version,
+
+		Mapper: experimental.RESTMapper,
+
+		Creater:   api.Scheme,
+		Convertor: api.Scheme,
+		Typer:     api.Scheme,
+		Linker:    experimental.SelfLinker,
+		Codec:     experimental.Codec,
+
+		Storage: storage,
+
+		Admit:   m.admissionControl,
+		Context: m.requestContextMapper,
+
+		ProxyDialerFn:     m.dialer,
+		MinRequestTimeout: m.minRequestTimeout,
+	}
+}
+
 func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 	return &apiserver.APIGroupVersion{
-		Root: m.apiPrefix,
+		Root:  m.apiPrefix,
+		Group: api.Group,
 
 		Mapper: latest.RESTMapper,
 

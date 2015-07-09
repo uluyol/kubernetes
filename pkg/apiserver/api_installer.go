@@ -119,7 +119,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if err != nil {
 		return err
 	}
-	versionedPtr, err := a.group.Creater.New(api.Group, a.group.Version, kind)
+	versionedPtr, err := a.group.Creater.New(a.group.Group, a.group.Version, kind)
 	if err != nil {
 		return err
 	}
@@ -174,14 +174,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if isLister {
 		list := lister.NewList()
 		listTM, err := a.group.Typer.ObjectTypeMeta(list)
-		versionedListPtr, err := a.group.Creater.New(api.Group, a.group.Version, listTM.Kind)
+		versionedListPtr, err := a.group.Creater.New(a.group.Group, a.group.Version, listTM.Kind)
 		if err != nil {
 			return err
 		}
 		versionedList = indirectArbitraryPointer(versionedListPtr)
 	}
 
-	versionedListOptions, err := a.group.Creater.New(api.Group, serverVersion, "ListOptions")
+	versionedListOptions, err := a.group.Creater.New(a.group.Group, serverVersion, "ListOptions")
 	if err != nil {
 		return err
 	}
@@ -189,7 +189,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var versionedDeleterObject interface{}
 	switch {
 	case isGracefulDeleter:
-		objectPtr, err := a.group.Creater.New(api.Group, serverVersion, "DeleteOptions")
+		objectPtr, err := a.group.Creater.New(a.group.Group, serverVersion, "DeleteOptions")
 		if err != nil {
 			return err
 		}
@@ -199,7 +199,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		gracefulDeleter = rest.GracefulDeleteAdapter{deleter}
 	}
 
-	versionedStatusPtr, err := a.group.Creater.New(api.Group, serverVersion, "Status")
+	versionedStatusPtr, err := a.group.Creater.New(a.group.Group, serverVersion, "Status")
 	if err != nil {
 		return err
 	}
@@ -358,6 +358,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Creater:          a.group.Creater,
 		Convertor:        a.group.Convertor,
 		Codec:            mapping.Codec,
+		APIGroup:         a.group.Group,
 		APIVersion:       a.group.Version,
 		ServerAPIVersion: serverVersion,
 		Resource:         resource,

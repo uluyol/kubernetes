@@ -77,6 +77,7 @@ type APIGroupVersion struct {
 	Storage map[string]rest.Storage
 
 	Root    string
+	Group   string
 	Version string
 
 	// ServerVersion controls the Kubernetes APIVersion used for common objects in the apiserver

@@ -22,6 +22,7 @@ import (
 )
 
 type attributesRecord struct {
+	group       string
 	kind        string
 	namespace   string
 	name        string
@@ -32,8 +33,9 @@ type attributesRecord struct {
 	userInfo    user.Info
 }
 
-func NewAttributesRecord(object runtime.Object, kind, namespace, name, resource, subresource string, operation Operation, userInfo user.Info) Attributes {
+func NewAttributesRecord(object runtime.Object, group, kind, namespace, name, resource, subresource string, operation Operation, userInfo user.Info) Attributes {
 	return &attributesRecord{
+		group:       group,
 		kind:        kind,
 		namespace:   namespace,
 		name:        name,
@@ -43,6 +45,10 @@ func NewAttributesRecord(object runtime.Object, kind, namespace, name, resource,
 		object:      object,
 		userInfo:    userInfo,
 	}
+}
+
+func (record *attributesRecord) GetGroup() string {
+	return record.group
 }
 
 func (record *attributesRecord) GetKind() string {

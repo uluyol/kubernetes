@@ -23,7 +23,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
@@ -49,11 +48,15 @@ type exists struct {
 }
 
 func (e *exists) Admit(a admission.Attributes) (err error) {
-	defaultVersion, kind, err := latest.RESTMapper.VersionAndKindForResource(a.GetResource())
+	restMapper, err := api.GetRESTMapper(a.GetGroup())
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
-	mapping, err := latest.RESTMapper.RESTMapping(kind, defaultVersion)
+	defaultVersion, kind, err := restMapper.VersionAndKindForResource(a.GetResource())
+	if err != nil {
+		return admission.NewForbidden(a, err)
+	}
+	mapping, err := restMapper.RESTMapping(kind, defaultVersion)
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}

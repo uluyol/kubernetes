@@ -122,6 +122,7 @@ func init() {
 		}
 	}
 	RESTMapper = mapper
+	api.RegisterRESTMapper(api.Group, RESTMapper)
 }
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version

@@ -1,0 +1,19 @@
+{
+	"apiVersion": "k8s.io/experimental",
+	"kind": "Hello",
+	"metadata": {
+		"name": "myhello"
+	},
+	"text": "this is a smart hello, hello hello, not bye quite yet.",
+	"test": "This is another text.",
+	"template": {
+		"metadata": {
+			"name": "myhellospec"
+		},
+		"spec": {
+			"volumes": [{
+				"name": "vol1"
+			}]
+		}
+	}
+}

@@ -201,7 +201,8 @@ func handleInternal(legacy bool, storage map[string]rest.Storage, admissionContr
 	group := &APIGroupVersion{
 		Storage: storage,
 
-		Root: "/api",
+		Root:  "/api",
+		Group: "api",
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
@@ -1961,6 +1962,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Context: requestContextMapper,
 		Mapper:  namespaceMapper,
 
+		Group:         "api",
 		Version:       newVersion,
 		ServerVersion: newVersion,
 		Codec:         newCodec,
