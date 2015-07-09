@@ -20,3 +20,8 @@ type HelloList struct {
 
 	Items []Hello `json:"items,omitempty"`
 }
+
+type DeleteOptions struct{ v1.DeleteOptions }
+type Namespace struct{ v1.Namespace }
+type ListOptions struct{ v1.ListOptions }
+type Status struct{ v1.Status }

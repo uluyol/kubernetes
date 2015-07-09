@@ -65,7 +65,7 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 	if version != destVersion {
 		objOut, err := s.NewObject(group, destVersion, kind)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%v @group: %s version: %s, kind %s@", err, group, version, kind)
 		}
 		flags, meta := s.generateConvertMeta(version, destVersion, obj)
 		err = s.converter.Convert(obj, objOut, flags, meta)

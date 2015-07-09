@@ -7,16 +7,16 @@ import (
 
 type Hello struct {
 	runtime.TypeMeta `json:",inline"`
-	api.ObjectMeta    `json:"metadata,omitempty"`
+	api.ObjectMeta   `json:"metadata,omitempty"`
 
-	Text     string              `json:"text,omitempty"`
-	Text2    string              `json:"test,omitempty"`
+	Text     string               `json:"text,omitempty"`
+	Text2    string               `json:"test,omitempty"`
 	Template *api.PodTemplateSpec `json:"template,omitempty"`
 }
 
 type HelloList struct {
 	runtime.TypeMeta `json:",inline"`
-	api.ObjectMeta    `json:"metadata,omitempty"`
+	api.ObjectMeta   `json:"metadata,omitempty"`
 
 	Items []Hello `json:"items,omitempty"`
 }

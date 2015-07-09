@@ -3,7 +3,6 @@ package experimental
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/experimental/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -22,21 +21,16 @@ func init() {
 	api.Scheme.AddKnownTypes(Group, "",
 		&latest.Hello{},
 		&latest.HelloList{},
-
-		&api.DeleteOptions{},
-		&api.Namespace{},
-		&api.ListOptions{},
-		&api.Status{},
 	)
 
 	api.Scheme.AddKnownTypes(Group, Version,
 		&Hello{},
 		&HelloList{},
 
-		&v1.DeleteOptions{},
-		&v1.Namespace{},
-		&v1.ListOptions{},
-		&v1.Status{},
+		&DeleteOptions{},
+		&Namespace{},
+		&ListOptions{},
+		&Status{},
 	)
 
 	initExperimental()
@@ -44,3 +38,8 @@ func init() {
 
 func (*Hello) IsAnAPIObject()     {}
 func (*HelloList) IsAnAPIObject() {}
+
+func (*DeleteOptions) IsAnAPIObject() {}
+func (*Namespace) IsAnAPIObject()     {}
+func (*ListOptions) IsAnAPIObject()   {}
+func (*Status) IsAnAPIObject()        {}
