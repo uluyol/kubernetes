@@ -48,11 +48,11 @@ func (tc timeCount) String() string {
 	m := (tc.time % time.Hour) / time.Minute
 	s := (tc.time % time.Minute) / time.Second
 	if m == 0 && s == 0 {
-		return fmt.Sprintf("(%02d, %d)", h, tc.count)
+		return fmt.Sprintf("(%02dZ, %d)", h, tc.count)
 	} else if s == 0 {
-		return fmt.Sprintf("(%02d:%02d, %d)", h, m, tc.count)
+		return fmt.Sprintf("(%02d:%02dZ, %d)", h, m, tc.count)
 	}
-	return fmt.Sprintf("(%02d:%02d:%02d, %d)", h, m, s, tc.count)
+	return fmt.Sprintf("(%02d:%02d:%02dZ, %d)", h, m, s, tc.count)
 }
 
 func timeMustParse(layout, s string) time.Time {
@@ -66,16 +66,14 @@ func timeMustParse(layout, s string) time.Time {
 var epoch = timeMustParse("150405", "000000")
 
 func parseTimeRelative(s string) (time.Duration, error) {
-	layouts := []string{"150405", "15:04:05", "1504", "15:04", "15"}
-	for _, layout := range layouts {
-		t, err := time.Parse(layout, s)
-		if err == nil {
-			return t.Sub(epoch), nil
-		}
+	t, err := parseTimeISO8601(s)
+	if err != nil {
+		return 0, fmt.Errorf("unable to parse %s: %v", s, err)
 	}
-	return 0, fmt.Errorf("%s must be in the form hhmmss, hh:mm:ss, hhmm, hh:mm, or hh", s)
+	return (t.Sub(epoch) + dayPeriod) % dayPeriod, nil
 }
 
+// TODO: sort these
 func parseTimeCounts(times string, counts string) ([]timeCount, error) {
 	ts := strings.Split(times, ",")
 	cs := strings.Split(counts, ",")
@@ -114,58 +112,6 @@ type Scaler struct {
 	start      time.Time
 	pos        int
 	done       chan struct{}
-}
-
-func NewScaler(tc []timeCount, selector labels.Selector) (*Scaler, error) {
-	smoothed, err := smoothChanges(tc, *maxScaleRate)
-	if err != nil {
-		return nil, err
-	}
-	return &Scaler{timeCounts: smoothed, selector: selector}, nil
-}
-
-// smoothChanges will add intermediate changes so that the rate of change will not
-// exceed maxRate (number of replicas added/removed per minute). It does not linearly
-// interpolate the changes, only insert additional steps before the change so that
-// maxRate is not exceeded.
-func smoothChanges(tc []timeCount, maxRate float64) ([]timeCount, error) {
-	if len(tc) == 0 {
-		return tc, nil
-	}
-	// Need to smooth the end as well
-	tc = append(tc, tc[0])
-	smoothed := []timeCount{tc[0]}
-	for i := 1; i < len(tc); i++ {
-		tdiff := float64(tc[i].time-tc[i-1].time) / float64(time.Minute)
-		if i == len(tc)-1 {
-			tdiff = float64(dayPeriod+tc[i-1].time-tc[i].time) / float64(time.Minute)
-		}
-		cdiff := float64(tc[i].count - tc[i-1].count)
-		sign := 1.0
-		if cdiff < 0 {
-			cdiff = -cdiff
-			sign = -1
-		}
-		rate := cdiff / tdiff
-		if rate > maxRate {
-			return nil, errors.New("cannot meet maximum scaling rate with given times and replica counts")
-		}
-		var intermediateCounts []int
-		count := float64(tc[i].count) - sign*maxRate
-		for sign*count > sign*float64(tc[i-1].count) {
-			intermediateCounts = append(intermediateCounts, int(count))
-			count -= sign * maxRate
-		}
-		for j := len(intermediateCounts) - 1; j >= 0; j-- {
-			cur := intermediateCounts[j]
-			if cur != smoothed[len(smoothed)-1].count && cur != tc[i].count {
-				t := (dayPeriod + tc[i].time - time.Duration(j+1)*time.Minute) % dayPeriod
-				smoothed = append(smoothed, timeCount{t, cur})
-			}
-		}
-		smoothed = append(smoothed, tc[i])
-	}
-	return smoothed[:len(smoothed)-1], nil
 }
 
 var posError = errors.New("could not find position")
@@ -258,13 +204,12 @@ func (s *Scaler) Stop() error {
 }
 
 var (
-	counts       = flag.String("counts", "", "replica counts, must have at least one (csv)")
-	times        = flag.String("times", "", "times to set replica counts relative to UTC following ISO 8601 (csv)")
-	userLabels   = flag.String("labels", "", "replication controller labels, syntax should follow https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/labels#Parse")
-	maxScaleRate = flag.Float64("maxrate", 5, "max number of replicas that may be added/removed per minute")
-	startNow     = flag.Bool("now", false, "times are relative to now not 0:00 UTC (for demos)")
-	local        = flag.Bool("local", false, "set to true if running on local machine not within cluster")
-	localPort    = flag.Int("localport", 8001, "port that kubectl proxy is running on (local must be true)")
+	counts     = flag.String("counts", "", "replica counts, must have at least one (csv)")
+	times      = flag.String("times", "", "times to set replica counts relative to UTC following ISO 8601 (csv)")
+	userLabels = flag.String("labels", "", "replication controller labels, syntax should follow https://godoc.org/github.com/GoogleCloudPlatform/kubernetes/pkg/labels#Parse")
+	startNow   = flag.Bool("now", false, "times are relative to now not 0:00 UTC (for demos)")
+	local      = flag.Bool("local", false, "set to true if running on local machine not within cluster")
+	localPort  = flag.Int("localport", 8001, "port that kubectl proxy is running on (local must be true)")
 
 	namespace string = os.Getenv("POD_NAMESPACE")
 
@@ -273,7 +218,7 @@ var (
 
 const usageNotes = `
 counts and times must both be set and be of equal length. Example usage:
-  diurnal -labels name=redis-slave -times 00:00,06:00 -counts 3,9 -maxrate 1
+  diurnal -labels name=redis-slave -times 00:00,06:00 -counts 3,9
 `
 
 func usage() {
@@ -313,7 +258,7 @@ func main() {
 	if namespace == "" {
 		glog.Fatal("POD_NAMESPACE is not set. Set to the namespace of the replication controller if running locally.")
 	}
-	scaler, err := NewScaler(tc, selector)
+	scaler := Scaler{timeCounts: tc, selector: selector}
 	if err != nil {
 		glog.Fatal(err)
 	}
