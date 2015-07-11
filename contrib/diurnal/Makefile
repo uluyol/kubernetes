@@ -1,6 +1,6 @@
 .PHONY: build push vet test clean
 
-TAG = 0.4.1
+TAG = 0.4.2
 REPO = uluyol/kube-diurnal
 
 BIN = dc
