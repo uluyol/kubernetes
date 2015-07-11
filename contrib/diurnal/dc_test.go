@@ -59,3 +59,26 @@ func TestParseTimeCounts(t *testing.T) {
 		}
 	}
 }
+
+func TestFindPos(t *testing.T) {
+	cases := []struct {
+		tc       []timeCount
+		cur      int
+		offset   time.Duration
+		expected int
+	}{
+		{[]timeCount{{0, 1}, {4, 0}}, 1, 1, 1},
+		{[]timeCount{{0, 1}, {4, 0}}, 0, 1, 1},
+		{[]timeCount{{0, 1}, {4, 0}}, 1, 70, 0},
+		{[]timeCount{{5, 1}, {100, 9000}, {4000, 2}, {10000, 4}}, 0, 0, 0},
+		{[]timeCount{{5, 1}, {100, 9000}, {4000, 2}, {10000, 4}}, 1, 5000, 3},
+		{[]timeCount{{5, 1}, {100, 9000}, {4000, 2}, {10000, 4}}, 2, 10000000, 0},
+		{[]timeCount{{5, 1}, {100, 9000}, {4000, 2}, {10000, 4}}, 0, 50, 1},
+	}
+	for i, test := range cases {
+		pos := findPos(test.tc, test.cur, test.offset)
+		if pos != test.expected {
+			t.Errorf("case %d: expected %d got %d", i, test.expected, pos)
+		}
+	}
+}
