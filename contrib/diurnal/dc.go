@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -55,6 +56,12 @@ func (tc timeCount) String() string {
 	return fmt.Sprintf("(%02d:%02d:%02dZ, %d)", h, m, s, tc.count)
 }
 
+type byTime []timeCount
+
+func (tc byTime) Len() int           { return len(tc) }
+func (tc byTime) Swap(i, j int)      { tc[i], tc[j] = tc[j], tc[i] }
+func (tc byTime) Less(i, j int) bool { return tc[i].time < tc[j].time }
+
 func timeMustParse(layout, s string) time.Time {
 	t, err := time.Parse(layout, s)
 	if err != nil {
@@ -73,7 +80,6 @@ func parseTimeRelative(s string) (time.Duration, error) {
 	return (t.Sub(epoch) + dayPeriod) % dayPeriod, nil
 }
 
-// TODO: sort these
 func parseTimeCounts(times string, counts string) ([]timeCount, error) {
 	ts := strings.Split(times, ",")
 	cs := strings.Split(counts, ",")
@@ -81,19 +87,11 @@ func parseTimeCounts(times string, counts string) ([]timeCount, error) {
 		return nil, fmt.Errorf("provided %d times but %d replica counts", len(ts), len(cs))
 	}
 	var tc []timeCount
-	prev := time.Duration(-1)
 	for i := range ts {
 		t, err := parseTimeRelative(ts[i])
 		if err != nil {
 			return nil, err
 		}
-		if t < 0 {
-			return nil, errors.New("times must be non-negative")
-		}
-		if t <= prev {
-			return nil, errors.New("times must be in increasing order")
-		}
-		prev = t
 		c, err := strconv.ParseInt(cs[i], 10, 64)
 		if c < 0 {
 			return nil, errors.New("counts must be non-negative")
@@ -103,6 +101,7 @@ func parseTimeCounts(times string, counts string) ([]timeCount, error) {
 		}
 		tc = append(tc, timeCount{t, int(c)})
 	}
+	sort.Sort(byTime(tc))
 	return tc, nil
 }
 
@@ -218,7 +217,8 @@ var (
 
 const usageNotes = `
 counts and times must both be set and be of equal length. Example usage:
-  diurnal -labels name=redis-slave -times 00:00,06:00 -counts 3,9
+  diurnal -labels name=redis-slave -times 00:00:00Z,06:00:00Z -counts 3,9
+  diurnal -labels name=redis-slave -times 0600-0500,0900-0500,1700-0500,2200-0500 -counts 15,20,13,6
 `
 
 func usage() {

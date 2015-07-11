@@ -32,8 +32,15 @@ func TestParseTimeCounts(t *testing.T) {
 				{4 * time.Hour, 8},
 			}, false,
 		},
+		{
+			"00:01Z,00:02Z,00:05Z,00:03Z", "1,2,3,4", []timeCount{
+				{1 * time.Minute, 1},
+				{2 * time.Minute, 2},
+				{3 * time.Minute, 4},
+				{5 * time.Minute, 3},
+			}, false,
+		},
 		{"00:00Z,00:01Z", "1,0", []timeCount{{0, 1}, {1 * time.Minute, 0}}, false},
-		{"00:01Z,00:02Z,00:05Z,00:02Z", "1,2,3,4", nil, true},
 		{"00:00+00,00:01+00:00,01:00Z", "0,-1,0", nil, true},
 		{"-00:01Z,01:00Z", "0,1", nil, true},
 		{"00:00Z", "1,2,3", nil, true},

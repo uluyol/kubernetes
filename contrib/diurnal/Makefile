@@ -5,8 +5,8 @@ REPO = uluyol/kube-diurnal
 
 BIN = dc
 
-dc: dc.go
-	CGO_ENABLED=0 godep go build -a -installsuffix cgo dc.go
+dc: dc.go time.go
+	CGO_ENABLED=0 godep go build -a -installsuffix cgo -o dc dc.go time.go
 
 vet:
 	godep go vet .
