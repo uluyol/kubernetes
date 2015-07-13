@@ -11031,13 +11031,14 @@
      "target"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
@@ -11138,13 +11139,14 @@
      "items"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -11175,13 +11177,14 @@
    "v1beta3.ComponentStatus": {
     "id": "v1beta3.ComponentStatus",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
@@ -11227,13 +11230,14 @@
      "items"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -11254,13 +11258,14 @@
      "subsets"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
@@ -11351,13 +11356,14 @@
    "v1beta3.Status": {
     "id": "v1beta3.Status",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -11431,13 +11437,14 @@
    "v1beta3.DeleteOptions": {
     "id": "v1beta3.DeleteOptions",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "gracePeriodSeconds": {
       "type": "integer",
@@ -11452,13 +11459,14 @@
      "items"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -11480,13 +11488,14 @@
      "involvedObject"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
@@ -11542,13 +11551,14 @@
      "items"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -11566,13 +11576,14 @@
    "v1beta3.LimitRange": {
     "id": "v1beta3.LimitRange",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
@@ -11626,13 +11637,14 @@
      "items"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -11650,13 +11662,14 @@
    "v1beta3.Namespace": {
     "id": "v1beta3.Namespace",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
@@ -11703,13 +11716,14 @@
      "items"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -11727,13 +11741,14 @@
    "v1beta3.Node": {
     "id": "v1beta3.Node",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
@@ -11901,13 +11916,14 @@
    "v1beta3.PersistentVolumeClaimList": {
     "id": "v1beta3.PersistentVolumeClaimList",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -11925,13 +11941,14 @@
    "v1beta3.PersistentVolumeClaim": {
     "id": "v1beta3.PersistentVolumeClaim",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
@@ -12007,13 +12024,14 @@
    "v1beta3.PersistentVolumeList": {
     "id": "v1beta3.PersistentVolumeList",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -12031,13 +12049,14 @@
    "v1beta3.PersistentVolume": {
     "id": "v1beta3.PersistentVolume",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
@@ -12323,13 +12342,14 @@
      "items"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -12347,13 +12367,14 @@
    "v1beta3.Pod": {
     "id": "v1beta3.Pod",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
@@ -13083,13 +13104,14 @@
      "items"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -13107,13 +13129,14 @@
    "v1beta3.PodTemplate": {
     "id": "v1beta3.PodTemplate",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
@@ -13144,13 +13167,14 @@
      "items"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -13168,13 +13192,14 @@
    "v1beta3.ReplicationController": {
     "id": "v1beta3.ReplicationController",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
@@ -13232,13 +13257,14 @@
      "items"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -13256,13 +13282,14 @@
    "v1beta3.ResourceQuota": {
     "id": "v1beta3.ResourceQuota",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
@@ -13306,13 +13333,14 @@
      "items"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -13330,13 +13358,14 @@
    "v1beta3.Secret": {
     "id": "v1beta3.Secret",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
@@ -13358,13 +13387,14 @@
      "items"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -13382,13 +13412,14 @@
    "v1beta3.ServiceAccount": {
     "id": "v1beta3.ServiceAccount",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
@@ -13416,13 +13447,14 @@
      "items"
     ],
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ListMeta",
@@ -13440,13 +13472,14 @@
    "v1beta3.Service": {
     "id": "v1beta3.Service",
     "properties": {
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
+     "apiGroup": {
+      "type": "string"
      },
      "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
+      "type": "string"
+     },
+     "kind": {
+      "type": "string"
      },
      "metadata": {
       "$ref": "v1beta3.ObjectMeta",
