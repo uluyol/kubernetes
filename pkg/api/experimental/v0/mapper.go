@@ -1,7 +1,10 @@
-package experimental
+package v0
 
 import (
+	"fmt"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/experimental"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -20,13 +23,13 @@ var SelfLinker = runtime.SelfLinker(accessor)
 // Kubernetes versions.
 var RESTMapper meta.RESTMapper
 
-func initExperimental() {
-	versions := []string{Version}
+func initRESTMapper() {
+	versions := []string{experimental.Version}
 
 	mapper := meta.NewDefaultRESTMapper(
 		versions,
 		func(version string) (*meta.VersionInterfaces, bool) {
-			if version == Version {
+			if version == experimental.Version {
 				return &meta.VersionInterfaces{
 					Codec:            Codec,
 					ObjectConvertor:  api.Scheme,
@@ -45,7 +48,9 @@ func initExperimental() {
 	ignoredKinds := util.NewStringSet()
 
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources.
-	for kind := range api.Scheme.KnownTypes(Group, Version) {
+	fmt.Println("HERE")
+	for kind := range api.Scheme.KnownTypes(experimental.Group, experimental.Version) {
+		fmt.Println("GOT kind", kind)
 		if ignoredKinds.Has(kind) {
 			continue
 		}
@@ -53,8 +58,10 @@ func initExperimental() {
 		if kindToRootScope[kind] {
 			scope = meta.RESTScopeRoot
 		}
-		mapper.Add(scope, kind, Version, false)
+		fmt.Println("STIL GOT kind", kind)
+		mapper.Add(scope, kind, experimental.Version, false)
 	}
 	RESTMapper = mapper
-	api.RegisterRESTMapper(Group, RESTMapper)
+	fmt.Println("RESTMAPPER;", RESTMapper)
+	api.RegisterRESTMapper(experimental.Group, RESTMapper)
 }

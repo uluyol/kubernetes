@@ -35,6 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/experimental"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/experimental/v0"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
@@ -572,7 +573,7 @@ func (m *Master) init(c *Config) {
 			glog.Fatalf("Unable to setup experimental API: %v", err)
 		}
 		expVersions := []string{experimental.Version}
-		apiserver.AddApiWebService(m.handlerContainer, experimental.Group, expVersions)
+		apiserver.AddApiWebService(m.handlerContainer, "/" + experimental.Group, expVersions)
 		requestInfoResolver := &apiserver.APIRequestInfoResolver{util.NewStringSet(experimental.Group), expGroupVersion.Mapper}
 		apiserver.InstallServiceErrorHandler(m.handlerContainer, requestInfoResolver, expVersions)
 	}
@@ -741,20 +742,20 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 
 func (m *Master) experimental_group(helper tools.EtcdHelper) *apiserver.APIGroupVersion {
 	storage := map[string]rest.Storage{
-		"hello": helloetcd.NewStorage(tools.NewEtcdHelper(helper.Client, experimental.Codec, DefaultEtcdPathPrefix)),
+		"hello": helloetcd.NewStorage(tools.NewEtcdHelper(helper.Client, v0.Codec, DefaultEtcdPathPrefix)),
 	}
 	return &apiserver.APIGroupVersion{
-		Root:    experimental.Group,
+		Root:    "/" + experimental.Group,
 		Group:   experimental.Group,
 		Version: experimental.Version,
 
-		Mapper: experimental.RESTMapper,
+		Mapper: v0.RESTMapper,
 
 		Creater:   api.Scheme,
 		Convertor: api.Scheme,
 		Typer:     api.Scheme,
-		Linker:    experimental.SelfLinker,
-		Codec:     experimental.Codec,
+		Linker:    v0.SelfLinker,
+		Codec:     v0.Codec,
 
 		Storage: storage,
 
