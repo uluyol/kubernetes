@@ -55,6 +55,7 @@ import (
 	endpointsetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
+	helloetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/expapi/hello/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	nodeetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion/etcd"
@@ -778,7 +779,9 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 
 // expapi returns the resources and codec for the experimental api
 func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
-	storage := map[string]rest.Storage{}
+	storage := map[string]rest.Storage{
+		"hello": helloetcd.NewStorage(c.ExpDatabaseStorage),
+	}
 	return &apiserver.APIGroupVersion{
 		Root: m.expAPIPrefix,
 

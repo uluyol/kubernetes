@@ -16,4 +16,14 @@ limitations under the License.
 
 package expapi
 
-func init() {}
+import "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+
+func init() {
+	api.Scheme.AddKnownTypes("",
+		&Hello{},
+		&HelloList{},
+	)
+}
+
+func (*Hello) IsAnAPIObject()     {}
+func (*HelloList) IsAnAPIObject() {}

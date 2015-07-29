@@ -16,4 +16,47 @@ limitations under the License.
 
 package v1
 
-func addDeepCopyFuncs() {}
+import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+)
+
+func deepCopy_v1_Hello(in Hello, out *Hello, c *conversion.Cloner) error {
+	out.TypeMeta = in.TypeMeta
+	m, err := api.Scheme.DeepCopy(&in.ObjectMeta)
+	if err != nil {
+		return err
+	}
+	out.ObjectMeta = *m.(*v1.ObjectMeta)
+	out.Text = in.Text
+	out.Text2 = in.Text2
+	t, err := api.Scheme.DeepCopy(in.Template)
+	if err != nil {
+		return err
+	}
+	out.Template = t.(*v1.PodTemplateSpec)
+	return nil
+}
+
+func deepCopy_v1_HelloList(in HelloList, out *HelloList, c *conversion.Cloner) error {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	out.Items = make([]Hello, len(in.Items))
+	for i := range in.Items {
+		if err := deepCopy_v1_Hello(in.Items[i], &out.Items[i], c); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func addDeepCopyFuncs() {
+	err := api.Scheme.AddDeepCopyFuncs(
+		deepCopy_v1_Hello,
+		deepCopy_v1_HelloList,
+	)
+	if err != nil {
+		panic(err)
+	}
+}
