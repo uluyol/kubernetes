@@ -24,7 +24,15 @@ import (
 var Codec = runtime.CodecFor(api.Scheme, "v1")
 
 func init() {
+	api.Scheme.AddKnownTypes("v1",
+		&Hello{},
+		&HelloList{},
+	)
+
 	addDeepCopyFuncs()
 	addConversionFuncs()
 	addDefaultingFuncs()
 }
+
+func (*Hello) IsAnAPIObject()     {}
+func (*HelloList) IsAnAPIObject() {}

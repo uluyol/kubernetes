@@ -27,3 +27,21 @@ support is experimental.
 */
 
 package expapi
+
+import "k8s.io/kubernetes/pkg/api"
+
+type Hello struct {
+	api.TypeMeta   `json:",inline"`
+	api.ObjectMeta `json:"metadata,omitempty"`
+
+	Text     string               `json:"text,omitempty"`
+	Text2    string               `json:"test,omitempty"`
+	Template *api.PodTemplateSpec `json:"template,omitempty"`
+}
+
+type HelloList struct {
+	api.TypeMeta `json:",inline"`
+	api.ListMeta `json:"metadata,omitempty"`
+
+	Items []Hello `json:"items,omitempty"`
+}

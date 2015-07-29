@@ -16,4 +16,46 @@ limitations under the License.
 
 package expapi
 
-func addDeepCopyFuncs() {}
+import (
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/conversion"
+)
+
+func deepCopy_expapi_Hello(in Hello, out *Hello, c *conversion.Cloner) error {
+	out.TypeMeta = in.TypeMeta
+	m, err := api.Scheme.DeepCopy(&in.ObjectMeta)
+	if err != nil {
+		return err
+	}
+	out.ObjectMeta = *m.(*api.ObjectMeta)
+	out.Text = in.Text
+	out.Text2 = in.Text2
+	t, err := api.Scheme.DeepCopy(in.Template)
+	if err != nil {
+		return err
+	}
+	out.Template = t.(*api.PodTemplateSpec)
+	return nil
+}
+
+func deepCopy_expapi_HelloList(in HelloList, out *HelloList, c *conversion.Cloner) error {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	out.Items = make([]Hello, len(in.Items))
+	for i := range in.Items {
+		if err := deepCopy_expapi_Hello(in.Items[i], &out.Items[i], c); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func addDeepCopyFuncs() {
+	err := api.Scheme.AddDeepCopyFuncs(
+		deepCopy_expapi_Hello,
+		deepCopy_expapi_HelloList,
+	)
+	if err != nil {
+		panic(err)
+	}
+}

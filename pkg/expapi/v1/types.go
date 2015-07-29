@@ -15,3 +15,21 @@ limitations under the License.
 */
 
 package v1
+
+import "k8s.io/kubernetes/pkg/api/v1"
+
+type Hello struct {
+	v1.TypeMeta   `json:",inline"`
+	v1.ObjectMeta `json:"metadata,omitempty"`
+
+	Text     string              `json:"text,omitempty"`
+	Text2    string              `json:"test,omitempty"`
+	Template *v1.PodTemplateSpec `json:"template,omitempty"`
+}
+
+type HelloList struct {
+	v1.TypeMeta `json:",inline"`
+	v1.ListMeta `json:"metadata,omitempty"`
+
+	Items []Hello `json:"items,omitempty"`
+}

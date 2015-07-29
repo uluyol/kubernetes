@@ -16,4 +16,14 @@ limitations under the License.
 
 package expapi
 
-func init() {}
+import "k8s.io/kubernetes/pkg/api"
+
+func init() {
+	api.Scheme.AddKnownTypes("",
+		&Hello{},
+		&HelloList{},
+	)
+}
+
+func (*Hello) IsAnAPIObject()     {}
+func (*HelloList) IsAnAPIObject() {}

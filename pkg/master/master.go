@@ -55,6 +55,7 @@ import (
 	endpointsetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
 	"k8s.io/kubernetes/pkg/registry/etcd"
 	"k8s.io/kubernetes/pkg/registry/event"
+	helloetcd "k8s.io/kubernetes/pkg/registry/expapi/hello/etcd"
 	"k8s.io/kubernetes/pkg/registry/limitrange"
 	"k8s.io/kubernetes/pkg/registry/minion"
 	nodeetcd "k8s.io/kubernetes/pkg/registry/minion/etcd"
@@ -777,7 +778,9 @@ func (m *Master) api_v1() *apiserver.APIGroupVersion {
 
 // expapi returns the resources and codec for the experimental api
 func (m *Master) expapi(c *Config) *apiserver.APIGroupVersion {
-	storage := map[string]rest.Storage{}
+	storage := map[string]rest.Storage{
+		"hellos": helloetcd.NewStorage(c.ExpDatabaseStorage),
+	}
 	return &apiserver.APIGroupVersion{
 		Root: m.expAPIPrefix,
 
