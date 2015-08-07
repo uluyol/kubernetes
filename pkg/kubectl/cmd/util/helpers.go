@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/client"
 	"k8s.io/kubernetes/pkg/client/clientcmd"
+	explatest "k8s.io/kubernetes/pkg/expapi/latest"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
@@ -399,4 +400,22 @@ func UpdateObject(info *resource.Info, updateFn func(runtime.Object) error) (run
 		return nil, err
 	}
 	return info.Object, nil
+}
+
+type groupID int
+
+const (
+	unknownGroup groupID = iota
+	apiGroup
+	experimentalGroup
+)
+
+func groupForResource(resource string) groupID {
+	gid := unknownGroup
+	if _, _, err := latest.RESTMapper.VersionAndKindForResource(resource); err == nil {
+		gid = apiGroup
+	} else if _, _, err := explatest.RESTMapper.VersionAndKindForResource(resource); err == nil {
+		gid = experimentalGroup
+	}
+	return gid
 }

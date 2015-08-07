@@ -178,8 +178,8 @@ type ScalerClient interface {
 	ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc
 }
 
-func NewScalerClient(c client.Interface) ScalerClient {
-	return &realScalerClient{c}
+func NewScalerClient(c client.VersionInterface) ScalerClient {
+	return &realScalerClient{c.(client.Interface)}
 }
 
 // realScalerClient is a ScalerClient which uses a Kube client.

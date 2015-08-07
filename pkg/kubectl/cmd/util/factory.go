@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -27,7 +28,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/registered"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -57,6 +57,8 @@ type Factory struct {
 	Object func() (meta.RESTMapper, runtime.ObjectTyper)
 	// Returns a client for accessing Kubernetes resources or an error.
 	Client func() (*client.Client, error)
+	// Returns a client for accessing experimental Kubernetes resources or an error.
+	ExperimentalClient func() (*client.ExperimentalClient, error)
 	// Returns a client.Config for accessing the Kubernetes server.
 	ClientConfig func() (*client.Config, error)
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
@@ -90,7 +92,7 @@ type Factory struct {
 // if optionalClientConfig is nil, then flags will be bound to a new clientcmd.ClientConfig.
 // if optionalClientConfig is not nil, then this factory will make use of it.
 func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
-	mapper := kubectl.ShortcutExpander{latest.RESTMapper}
+	mapper := kubectl.ShortcutExpander{api.RESTMapper}
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SetNormalizeFunc(util.WarnWordSepNormalizeFunc) // Warn for "_" flags
@@ -106,8 +108,23 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		clientConfig = DefaultClientConfig(flags)
 	}
 
-	clients := NewClientCache(clientConfig)
+	clients := newClientCache(clientConfig)
 
+	var experimentalClient *client.ExperimentalClient
+	cfg, experimentalClientErr := clientConfig.ClientConfig()
+	if experimentalClientErr == nil {
+		experimentalClient, experimentalClientErr = client.NewExperimental(cfg)
+	}
+
+	getVersionInterface := func(g groupID, version string) (client.VersionInterface, error) {
+		switch g {
+		case apiGroup:
+			return clients.ClientForVersion(version)
+		case experimentalGroup:
+			return experimentalClient, experimentalClientErr
+		}
+		return nil, errors.New("could not get client")
+	}
 	return &Factory{
 		clients:    clients,
 		flags:      flags,
@@ -123,26 +140,38 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		Client: func() (*client.Client, error) {
 			return clients.ClientForVersion("")
 		},
+		ExperimentalClient: func() (*client.ExperimentalClient, error) {
+			return experimentalClient, experimentalClientErr
+		},
 		ClientConfig: func() (*client.Config, error) {
 			return clients.ClientConfigForVersion("")
 		},
 		RESTClient: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-			client, err := clients.ClientForVersion(mapping.APIVersion)
-			if err != nil {
-				return nil, err
+			switch groupForResource(mapping.Resource) {
+			case apiGroup:
+				client, err := clients.ClientForVersion(mapping.APIVersion)
+				if err != nil {
+					return nil, err
+				}
+				return client.RESTClient, nil
+			case experimentalGroup:
+				client, err := experimentalClient, experimentalClientErr
+				if err != nil {
+					return nil, err
+				}
+				return client.RESTClient, nil
 			}
-			return client.RESTClient, nil
+			return nil, fmt.Errorf("unable to get RESTClient for resource '%s'", mapping.Resource)
 		},
 		Describer: func(mapping *meta.RESTMapping) (kubectl.Describer, error) {
-			client, err := clients.ClientForVersion(mapping.APIVersion)
+			client, err := getVersionInterface(groupForResource(mapping.Resource), mapping.APIVersion)
 			if err != nil {
 				return nil, err
 			}
-			describer, ok := kubectl.DescriberFor(mapping.Kind, client)
-			if !ok {
-				return nil, fmt.Errorf("no description has been implemented for %q", mapping.Kind)
+			if describer, ok := kubectl.DescriberFor(mapping.Kind, client); ok {
+				return describer, nil
 			}
-			return describer, nil
+			return nil, fmt.Errorf("no description has been implemented for %q", mapping.Kind)
 		},
 		Printer: func(mapping *meta.RESTMapping, noHeaders, withNamespace bool, wide bool, columnLabels []string) (kubectl.ResourcePrinter, error) {
 			return kubectl.NewHumanReadablePrinter(noHeaders, withNamespace, wide, columnLabels), nil
@@ -191,14 +220,14 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			return meta.NewAccessor().Labels(object)
 		},
 		Scaler: func(mapping *meta.RESTMapping) (kubectl.Scaler, error) {
-			client, err := clients.ClientForVersion(mapping.APIVersion)
+			client, err := getVersionInterface(groupForResource(mapping.Resource), mapping.APIVersion)
 			if err != nil {
 				return nil, err
 			}
 			return kubectl.ScalerFor(mapping.Kind, kubectl.NewScalerClient(client))
 		},
 		Reaper: func(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
-			client, err := clients.ClientForVersion(mapping.APIVersion)
+			client, err := getVersionInterface(groupForResource(mapping.Resource), mapping.APIVersion)
 			if err != nil {
 				return nil, err
 			}
@@ -210,7 +239,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				if err != nil {
 					return nil, err
 				}
-				return &clientSwaggerSchema{client, api.Scheme}, nil
+				return &clientSwaggerSchema{client, experimentalClient, api.Scheme}, nil
 			}
 			return validation.NullSchema{}, nil
 		},
@@ -273,20 +302,14 @@ func getServicePorts(spec api.ServiceSpec) []string {
 }
 
 type clientSwaggerSchema struct {
-	c *client.Client
-	t runtime.ObjectTyper
+	c  *client.Client
+	ec *client.ExperimentalClient
+	t  runtime.ObjectTyper
 }
 
-func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
-	version, _, err := runtime.UnstructuredJSONScheme.DataVersionAndKind(data)
-	if err != nil {
-		return err
-	}
-	if ok := registered.IsRegisteredAPIVersion(version); !ok {
-		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", version, registered.RegisteredVersions)
-	}
-	schemaData, err := c.c.RESTClient.Get().
-		AbsPath("/swaggerapi/api", version).
+func getSchemaAndValidate(c *client.RESTClient, data []byte, group, version string) error {
+	schemaData, err := c.Get().
+		AbsPath("/swaggerapi", group, version).
 		Do().
 		Raw()
 	if err != nil {
@@ -297,6 +320,28 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 		return err
 	}
 	return schema.ValidateBytes(data)
+}
+
+func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
+	version, _, err := runtime.UnstructuredJSONScheme.DataVersionAndKind(data)
+	if err != nil {
+		return err
+	}
+	if ok := registered.IsRegisteredAPIVersion(version); !ok {
+		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", version, registered.RegisteredVersions)
+	}
+	// First try stable api, if we can't validate using that, try experimental.
+	// If experimental fails, return error from stable api.
+	// TODO: Figure out which group to try once multiple group support is merged
+	//       instead of trying everything.
+	err = getSchemaAndValidate(c.c.RESTClient, data, "api", version)
+	if err != nil && c.ec != nil {
+		errExp := getSchemaAndValidate(c.ec.RESTClient, data, "experimental", version)
+		if errExp == nil {
+			return nil
+		}
+	}
+	return err
 }
 
 // DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:

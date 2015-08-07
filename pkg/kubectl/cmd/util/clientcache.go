@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientcmd"
 )
 
-func NewClientCache(loader clientcmd.ClientConfig) *clientCache {
+func newClientCache(loader clientcmd.ClientConfig) *clientCache {
 	return &clientCache{
 		clients: make(map[string]*client.Client),
 		configs: make(map[string]*client.Config),

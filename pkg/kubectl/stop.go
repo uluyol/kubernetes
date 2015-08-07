@@ -52,14 +52,14 @@ func IsNoSuchReaperError(err error) bool {
 	return ok
 }
 
-func ReaperFor(kind string, c client.Interface) (Reaper, error) {
+func ReaperFor(kind string, c client.VersionInterface) (Reaper, error) {
 	switch kind {
 	case "ReplicationController":
-		return &ReplicationControllerReaper{c, Interval, Timeout}, nil
+		return &ReplicationControllerReaper{c.(client.Interface), Interval, Timeout}, nil
 	case "Pod":
-		return &PodReaper{c}, nil
+		return &PodReaper{c.(client.Interface)}, nil
 	case "Service":
-		return &ServiceReaper{c}, nil
+		return &ServiceReaper{c.(client.Interface)}, nil
 	}
 	return nil, &NoSuchReaperError{kind}
 }

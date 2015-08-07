@@ -81,6 +81,10 @@ func describerMap(c *client.Client) map[string]Describer {
 	return m
 }
 
+func expDescriberMap(c *client.ExperimentalClient) map[string]Describer {
+	return map[string]Describer{}
+}
+
 // List of all resource types we can describe
 func DescribableResources() []string {
 	keys := make([]string, 0)
@@ -94,12 +98,16 @@ func DescribableResources() []string {
 
 // Describer returns the default describe functions for each of the standard
 // Kubernetes types.
-func DescriberFor(kind string, c *client.Client) (Describer, bool) {
-	f, ok := describerMap(c)[kind]
-	if ok {
-		return f, true
+func DescriberFor(kind string, c client.VersionInterface) (Describer, bool) {
+	var f Describer
+	var ok bool
+	switch c.(type) {
+	case *client.Client:
+		f, ok = describerMap(c.(*client.Client))[kind]
+	case *client.ExperimentalClient:
+		f, ok = expDescriberMap(c.(*client.ExperimentalClient))[kind]
 	}
-	return nil, false
+	return f, ok
 }
 
 // DefaultObjectDescriber can describe the default Kubernetes objects.
